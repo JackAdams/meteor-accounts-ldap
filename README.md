@@ -58,6 +58,8 @@ You can send info from the client to the server via the request parameter by ove
 
 ```LDAP.data = function () { return null; };```
 
+####Built in UI
+
 `{{> ldapLoginButtons}}` renders a template with username/email and password inputs. If login is successful, the user will be added to the `Meteor.users` collection. It is up to the app to publish and subscribe fields. By default, only the username is published.
 
 ####Warning
