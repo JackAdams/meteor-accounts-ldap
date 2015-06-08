@@ -1,9 +1,9 @@
-Accounts-Ldap
+Accounts LDAP
 -------------
 
 Authentication against an LDAP server for Meteor.
 
-####Overview
+#### Overview
 
 This is a package to implement authentication against an LDAP server and retrieval of user attributes from that server in Meteor. It is an adaptation of `hive:accounts-ldap`.
 
@@ -15,11 +15,11 @@ The things that this package does differently from `hive:accounts-ldap` are:
 - LDAP settings can be set programatically or using a `settings.json` file
 - can peacefully co-exist with the core package `accounts-password`
 
-####Installation
+#### Installation
 
 `meteor add babrahams:accounts-ldap`
 
-####Usage
+#### Usage
 
 Your server's URL and a DN or DNs to search will need to be set in a settings.json file as `serverUrl` and `serverDn`, respectively. In addition, you can select an array of `whiteListedFields` from an LDAP search to add to the user.profile field in the document created in `Meteor.users` . An example for the settings.json file is:
 
@@ -60,10 +60,10 @@ You can send info from the client to the server via the request parameter by ove
 
 ```LDAP.data = function () { return null; };```
 
-####Built in UI
+#### Built in UI
 
 `{{> ldapLoginButtons}}` renders a template with username/email and password inputs. If login is successful, the user will be added to the `Meteor.users` collection. It is up to the app to publish and subscribe fields. By default, only the username is published.
 
-####Warning
+#### Warning
 
 Password is sent from client to server in plain text.  Only use this package in conjunction with SSL.
