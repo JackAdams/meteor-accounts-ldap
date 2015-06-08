@@ -1,6 +1,8 @@
 Accounts-Ldap
 -------------
 
+Authentication against an LDAP server for Meteor.
+
 ####Overview
 
 This is a package to implement authentication against an LDAP server and retrieval of user attributes from that server in Meteor. It is an adaptation of `hive:accounts-ldap`.
