@@ -34,7 +34,16 @@ Your server's URL and a DN or DNs to search will need to be set in a settings.js
 
 **OR**
 
-To create settings programatically, overwrite the function below somewhere in your server code, returning an object of the form:
+To create settings programatically, overwrite the function below somewhere in your server code
+
+```
+// Overwrite this function to produce settings based on the incoming request
+LDAP.generateSettings = function (request) {
+  return null;	
+}
+```
+
+returning an object of the form:
 
 ```
 {
@@ -42,13 +51,6 @@ To create settings programatically, overwrite the function below somewhere in yo
   "serverUrl": "ldap://ad.university.edu:2222",
   "whiteListedFields": [ "displayName", "givenName", "department", "employeeNumber", "mail", "title", "address", "phone", "memberOf"],
   "autopublishFields": [ "displayName", "department", "mail", "title", "address", "phone"]
-}
-```
-
-```
-// Overwrite this function to produce settings based on the incoming request
-LDAP.generateSettings = function (request) {
-  return null;	
 }
 ```
 
