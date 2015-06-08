@@ -15,7 +15,7 @@ The things that this package does differently from `hive:accounts-ldap` are:
 
 ####Installation
 
-meteor add babrahams:accounts-ldap
+`meteor add babrahams:accounts-ldap`
 
 ####Usage
 
@@ -57,12 +57,6 @@ You can send info from the client to the server via the request parameter by ove
 ```LDAP.data = function () { return null; };```
 
 `{{> ldapLoginButtons}}` renders a template with username/email and password inputs. If login is successful, the user will be added to the `Meteor.users` collection. It is up to the app to publish and subscribe fields. By default, only the username is published.
-
-To run example:
-- cd babrahams:accounts-ldap/example
-- meteor --settings config/settings.json
-
-(Of course, you'll have to create a settings.json file with your own LDAP server details.)
 
 ####Warning
 
