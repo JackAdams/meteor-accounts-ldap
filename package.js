@@ -1,7 +1,7 @@
 Package.describe({
   'summary': 'Meteor account login via LDAP',
   'version': '0.1.0',
-  'git' : 'https://github.com/babrahams/meteor-accounts-ldap',
+  'git' : 'https://github.com/JackAdams/meteor-accounts-ldap',
   'name' : 'babrahams:accounts-ldap'
 });
 
@@ -12,7 +12,6 @@ Package.on_use(function (api) {
   api.use(['accounts-base', 'underscore'], ['client', 'server']);
   api.use('accounts-password','server');
   api.imply('accounts-base', ['client', 'server']);
-  //api.use('srp', ['client_functions', 'server']);
   api.use(['ui', 'templating', 'jquery', 'spacebars', 'reactive-var', 'less'], 'client');
   api.export('LDAP');
   api.add_files([
