@@ -60,6 +60,14 @@ You can send info from the client to the server via the request parameter by ove
 
 ```LDAP.data = function () { return null; };```
 
+You can create a custom filter by overwriting the `LDAP.filter` function **on the server** (if the default version, shown below, does not work for your particular LDAP configuration):
+
+```
+LDAP.filter = function (email, username) {
+  return '(&(' + ((email) ? 'mail' : 'cn') + '=' + username + ')(objectClass=user))';
+}
+```
+
 #### Built in UI
 
 `{{> ldapLoginButtons}}` renders a template with username/email and password inputs. If login is successful, the user will be added to the `Meteor.users` collection. It is up to the app to publish and subscribe fields. By default, only the username is published.

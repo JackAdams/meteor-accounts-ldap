@@ -3,6 +3,10 @@ var ldap = Npm.require('ldapjs');
 var Future = Npm.require('fibers/future');
 var assert = Npm.require('assert');
 
+LDAP.filter = function (email, username) {
+  return '(&(' + ((email) ? 'mail' : 'cn') + '=' + username + ')(objectClass=user))';
+}
+
 LDAP.createClient = function(serverUrl) {
   var client = ldap.createClient({
     url: serverUrl
@@ -47,7 +51,7 @@ LDAP.bind = function (client, username, password, email, request, settings) {
 LDAP.search = function (client, searchUsername, email, request, settings) {
   // Search our previously bound connection. If the LDAP client isn't bound, this should throw an error.
   var opts = {
-    filter: '(&(' + ((email) ? 'mail' : 'cn') + '=' + searchUsername + ')(objectClass=user))',
+    filter: LDAP.filter.call(null, email, searchUsername),
     scope: 'sub',
     timeLimit: 2
   };
