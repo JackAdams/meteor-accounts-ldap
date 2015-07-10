@@ -68,6 +68,8 @@ LDAP.filter = function (email, username) {
 }
 ```
 
+You can set `LDAP.tryDBFirst = true;` on the server if you want the package to try and log the user in using the app database before hitting the LDAP server. (This is `false` by default.)
+
 #### Built in UI
 
 `{{> ldapLoginButtons}}` renders a template with username/email and password inputs. If login is successful, the user will be added to the `Meteor.users` collection. It is up to the app to publish and subscribe fields. By default, only the username is published.
@@ -75,3 +77,12 @@ LDAP.filter = function (email, username) {
 #### Warning
 
 Password is sent from client to server in plain text.  Only use this package in conjunction with SSL.
+
+#### TODO
+
+- make the sign in form more configurable with options like:
+  - `unstyled=true` - to remove all classes
+  - `alwaysOpen` - to make the form automatically open
+  - `loggedOutLinkTemplate` - to replace the default link that you click to open the form
+  - `loggedInLinkTemplate` - to replace the default link that you click to get the dropdown once logged in
+  - `ionic=true` - to give the form the same look as the forms in `useraccounts:ionic`

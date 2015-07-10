@@ -1,4 +1,5 @@
 LDAP = {}; // { autoVerifyEmail : false };
+
 var ldap = Npm.require('ldapjs');
 var Future = Npm.require('fibers/future');
 var assert = Npm.require('assert');
@@ -6,6 +7,8 @@ var assert = Npm.require('assert');
 LDAP.filter = function (email, username) {
   return '(&(' + ((email) ? 'mail' : 'cn') + '=' + username + ')(objectClass=user))';
 }
+
+LDAP.tryDBFirst = false;
 
 LDAP.createClient = function(serverUrl) {
   var client = ldap.createClient({
@@ -111,14 +114,9 @@ LDAP.search = function (client, searchUsername, email, request, settings) {
   }
 };
 
-Accounts.registerLoginHandler("ldap", function (request) {
+Accounts.registerLoginHandler("ldap", function (request) { console.log("request:", request);
   if (!request.ldap) {
 	return;  
-  }
-  request.password = request.pwd; // Dodging the Accounts.loginWithPassword check
-  var settings = LDAP.settings(request);
-  if (!settings) {
-    throw new Error("LDAP settings missing.");
   }
   var username = request.username.toLowerCase();
   // Check if this is an email or a username
@@ -126,6 +124,35 @@ Accounts.registerLoginHandler("ldap", function (request) {
   if (/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/.test(username)) {
 	 // It's an email
 	 var email = true;  
+  }
+  if (!!Package["accounts-password"] && LDAP.tryDBFirst) {
+	// This is a blunt instrument and not up to MDG standard
+	// see: https://github.com/meteor/meteor/blob/devel/packages/accounts-password/password_server.js
+	// for a complete implementation
+	var fieldName;
+    var fieldValue;
+    if (!email) {
+      fieldName = 'username';
+      fieldValue = request.username;
+    }
+	else {
+      fieldName = 'emails.address';
+      fieldValue = request.username; // yes, `request.username` is actually an email address
+    }
+    var selector = {};
+    selector[fieldName] = fieldValue; console.log("Selector:",selector);
+    var user = Meteor.users.findOne(selector);
+	if (user){
+	  var res = Accounts._checkPassword(user, request.pwd);
+	  if (!res.error) {
+	    return res;
+	  }
+	}
+  }
+  request.password = request.pwd; // Dodging the Accounts.loginWithPassword check
+  var settings = LDAP.settings(request);
+  if (!settings) {
+    throw new Error("LDAP settings missing.");
   }
   if (settings.debugMode === true) {
     userObj = {username: username};
