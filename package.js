@@ -19,6 +19,6 @@ Package.on_use(function (api) {
   api.add_files([
     'ldap_client.html',
     'ldap_client.js',
-	'ldap_client.less'], 'client');
+    'ldap_client.less'], 'client');
   api.add_files('ldap_server.js', 'server');
 });

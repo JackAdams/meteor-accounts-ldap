@@ -28,20 +28,24 @@
 </template>
 
 <template name="ldapLoginButtons">
-  <div id="login-buttons" class="login-buttons-dropdown-align-{{align}}">
-    <div class="login-link-and-dropdown-list login-form-sign-in">
-      {{#if currentUser}}
-        <a id="logged-in-username" class="login-link-text">{{currentUser.username}} ▾</a>
-      {{else}}
-        <a id="login-sign-in-link" class="login-link-text">Sign in ▾</a>
-      {{/if}}
-      {{#if showForm}}
-        <div id="login-dropdown-list" class="accounts-dialog">
-          <a class="login-close-text">Close</a>
-          <div class="login-close-text-clear"></div>
-          {{> ldapLogin}}
-        </div>
-      {{/if}}
+  {{#if template}}
+    {{> Template.dynamic template=template data=this}}
+  {{else}}
+    <div id="login-buttons" class="login-buttons-dropdown-align-{{align}}">
+      <div class="login-link-and-dropdown-list login-form-sign-in">
+        {{#if currentUser}}
+          <a id="logged-in-username" class="login-link-text">{{currentUser.username}} ▾</a>
+        {{else}}
+          <a id="login-sign-in-link" class="login-link-text">Sign in ▾</a>
+        {{/if}}
+        {{#if showForm}}
+          <div id="login-dropdown-list" class="accounts-dialog">
+            <a class="login-close-text">Close</a>
+            <div class="login-close-text-clear"></div>
+            {{> ldapLogin}}
+          </div>
+        {{/if}}
+      </div>
     </div>
-  </div>
+  {{/if}}
 </template>

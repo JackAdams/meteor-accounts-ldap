@@ -8,6 +8,8 @@ LDAP.filter = function (email, username) {
   return '(&(' + ((email) ? 'mail' : 'cn') + '=' + username + ')(objectClass=user))';
 }
 
+// Flag to tell the loginHandler to have a poke at the app database first
+// (will only work if accounts-password package is present)
 LDAP.tryDBFirst = false;
 
 LDAP.createClient = function(serverUrl) {
@@ -71,16 +73,16 @@ LDAP.search = function (client, searchUsername, email, request, settings) {
       }
       else {
         res.on('searchEntry', function(entry) {
-		  var person = entry.object;
-		  var usernameOrEmail = searchUsername.toLowerCase();
-		  var username = (email) ? person.cn || usernameOrEmail.split('@')[0] : usernameOrEmail;
-		  var email = (email) ? usernameOrEmail : person.mail || username + '@' + serverDn.split(/,?DC=/).slice(1).join('.');
+          var person = entry.object;
+          var usernameOrEmail = searchUsername.toLowerCase();
+          var username = (email) ? person.cn || usernameOrEmail.split('@')[0] : usernameOrEmail;
+          var email = (email) ? usernameOrEmail : person.mail || username + '@' + serverDn.split(/,?DC=/).slice(1).join('.');
           userObj = {
-			username: username,
-			email: email,
-			password: request.password,
-			profile: _.pick(entry.object, _.without(settings.whiteListedFields, 'mail'))
-		  };// _.extend({username: username, email : [{address: email, verified: LDAP.autoVerifyEmail}]}, _.pick(entry.object, _.without(settings.whiteListedFields, 'mail')));
+            username: username,
+            email: email,
+            password: request.password,
+            profile: _.pick(entry.object, _.without(settings.whiteListedFields, 'mail'))
+          };// _.extend({username: username, email : [{address: email, verified: LDAP.autoVerifyEmail}]}, _.pick(entry.object, _.without(settings.whiteListedFields, 'mail')));
           searchFuture.return(userObj); 
         });
         res.on('searchReference', function (referral) {
@@ -114,40 +116,40 @@ LDAP.search = function (client, searchUsername, email, request, settings) {
   }
 };
 
-Accounts.registerLoginHandler("ldap", function (request) { console.log("request:", request);
+Accounts.registerLoginHandler("ldap", function (request) {
   if (!request.ldap) {
-	return;  
+    return;  
   }
   var username = request.username.toLowerCase();
   // Check if this is an email or a username
   var email = false;
   if (/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/.test(username)) {
-	 // It's an email
-	 var email = true;  
+     // It's an email
+     var email = true;  
   }
   if (!!Package["accounts-password"] && LDAP.tryDBFirst) {
-	// This is a blunt instrument and not up to MDG standard
-	// see: https://github.com/meteor/meteor/blob/devel/packages/accounts-password/password_server.js
-	// for a complete implementation
-	var fieldName;
+    // This is a blunt instrument and not up to MDG standard
+    // see: https://github.com/meteor/meteor/blob/devel/packages/accounts-password/password_server.js
+    // for a complete implementation
+    var fieldName;
     var fieldValue;
     if (!email) {
       fieldName = 'username';
       fieldValue = request.username;
     }
-	else {
+    else {
       fieldName = 'emails.address';
       fieldValue = request.username; // yes, `request.username` is actually an email address
     }
     var selector = {};
-    selector[fieldName] = fieldValue; console.log("Selector:",selector);
+    selector[fieldName] = fieldValue;
     var user = Meteor.users.findOne(selector);
-	if (user){
-	  var res = Accounts._checkPassword(user, request.pwd);
-	  if (!res.error) {
-	    return res;
-	  }
-	}
+    if (user){
+      var res = Accounts._checkPassword(user, request.pwd);
+      if (!res.error) {
+        return res;
+      }
+    }
   }
   request.password = request.pwd; // Dodging the Accounts.loginWithPassword check
   var settings = LDAP.settings(request);
@@ -168,10 +170,10 @@ Accounts.registerLoginHandler("ldap", function (request) { console.log("request:
   var userId;
   var condition = {};
   if (email) {
-	condition.emails = {$elemMatch: {address: username}}; // username is actually an email here 
+    condition.emails = {$elemMatch: {address: username}}; // username is actually an email here 
   }
   else {
-	condition.username = username;  
+    condition.username = username;  
   }
   // If we have two users with the same username, or two users with the same email address, we have a problem
   // For situations like this, we might want to modify the condition to include extra fields
@@ -208,10 +210,10 @@ LDAP.settings = function (request) {
 
 // Overwrite this function to produce settings based on the incoming request
 LDAP.generateSettings = function (request) {
-  return null;	
+  return null;    
 }
 
 // Overwrite this function to modify the condition used to find an existing user
 LDAP.modifyCondition = function (condition) {
-  return condition;	
+  return condition;    
 }
