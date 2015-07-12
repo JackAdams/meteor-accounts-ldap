@@ -7,6 +7,13 @@ var showForm = new ReactiveVar(false);
 var customFormTemplate = new ReactiveVar('');
 
 LDAP.customFormTemplate = customFormTemplate;
+
+LDAP._formHelpers = {
+  failedLogin : function () {
+    return !firstAttempt; //return true if more than one attempt has been made. Show Error Message
+  }
+};
+
 LDAP._formEvents = {
   'click #login-buttons-password': function(e, tpl) {
     initLogin(e,tpl);
@@ -34,11 +41,7 @@ Meteor.loginWithLdap = function (username, password, callback) {
   });
 };
 
-Template.ldapLogin.helpers({
-  failedLogin : function () {
-    return !firstAttempt; //return true if more than one attempt has been made. Show Error Message
-  }
-});
+Template.ldapLogin.helpers(LDAP._formHelpers);
 
 Template.ldapLogin.events(LDAP._formEvents);
 
@@ -62,17 +65,17 @@ Template.ldapLoginButtons.events({
 
 // Initiate Login Process:
 initLogin = function(e, tpl) {
-    var username = $(tpl.find('input[name="ldap"]')).val();
-    var password = $(tpl.find('input[name="password"]')).val();
-    var result = Meteor.loginWithLdap(username, password, function() {
-      if (Meteor.userId()) {
-        showForm.set(false);
-        return true;
-      }
-      else {
-        firstAttempt = false;
-        return false;
-      }
-    });
-    return result;
+  var username = $(tpl.find('input[name="ldap"]')).val();
+  var password = $(tpl.find('input[name="password"]')).val();
+  var result = Meteor.loginWithLdap(username, password, function() {
+	if (Meteor.userId()) {
+	  showForm.set(false);
+	  return true;
+	}
+	else {
+	  firstAttempt = false;
+	  return false;
+	}
+  });
+  return result;
 };
