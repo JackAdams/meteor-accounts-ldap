@@ -2,7 +2,7 @@ LDAP = {
   data : function () { return null; }
 };
 
-var firstAttempt = true;
+var firstAttempt = new ReactiveVar(true);
 var showForm = new ReactiveVar(false);
 var customFormTemplate = new ReactiveVar('');
 
@@ -10,7 +10,7 @@ LDAP.customFormTemplate = customFormTemplate;
 
 LDAP._formHelpers = {
   failedLogin : function () {
-    return !firstAttempt; //return true if more than one attempt has been made. Show Error Message
+    return !firstAttempt.get(); //return true if more than one attempt has been made. Show Error Message
   }
 };
 
@@ -24,7 +24,7 @@ LDAP._formEvents = {
       }
   },
   'click #login-buttons-logout': function(e) {
-    firstAttempt = true;
+    firstAttempt.set(true);
     Meteor.logout(function() {
       showForm.set(false);
     });
@@ -73,7 +73,7 @@ initLogin = function(e, tpl) {
 	  return true;
 	}
 	else {
-	  firstAttempt = false;
+	  firstAttempt.set(false);
 	  return false;
 	}
   });
