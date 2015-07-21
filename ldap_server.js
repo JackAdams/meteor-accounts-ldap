@@ -1,8 +1,18 @@
-LDAP = {}; // { autoVerifyEmail : false };
+LDAP = {
+  logging: true,
+  log: function (message) {
+	if (LDAP.logging) {
+	  console.log(message);
+	}
+  },
+  multitenantIdentifier: ''
+}; // { autoVerifyEmail : false };
 
-var ldap = Npm.require('ldapjs');
-var Future = Npm.require('fibers/future');
-var assert = Npm.require('assert');
+// *************************************************
+// Public methods that may be optionally overwritten
+// *************************************************
+
+// Overwrite this if you need a custom filter for your particular LDAP configuration
 
 LDAP.filter = function (email, username) {
   return '(&(' + ((email) ? 'mail' : 'cn') + '=' + username + ')(objectClass=user))';
@@ -12,14 +22,40 @@ LDAP.filter = function (email, username) {
 // (will only work if accounts-password package is present)
 LDAP.tryDBFirst = false;
 
-LDAP.createClient = function(serverUrl) {
+LDAP.addFields = function (entry) {
+  // `this` is the request from the client
+  // `entry` is the object returned from the LDAP server
+  // return the fields that are to be added when creating a user
+  return {};	
+}
+
+// Overwrite this function to produce settings based on the incoming request
+LDAP.generateSettings = function (request) {
+  return null;    
+}
+
+// Overwrite this function to modify the condition used to find an existing user
+LDAP.modifyCondition = function (condition) {
+  // `this` is the request received from the client
+  return condition;    
+}
+
+// *****************************************
+// Private methods, not intended for app use
+// *****************************************
+
+var ldap = Npm.require('ldapjs');
+var Future = Npm.require('fibers/future');
+var assert = Npm.require('assert');
+
+LDAP._createClient = function(serverUrl) {
   var client = ldap.createClient({
     url: serverUrl
   });
   return client;
 };
 
-LDAP.bind = function (client, username, password, email, request, settings) {
+LDAP._bind = function (client, username, password, email, request, settings) {
   var success = null;
   //Bind our LDAP client.
   var serverDNs = (typeof (settings.serverDn) == 'string') ? [settings.serverDn] : settings.serverDn;
@@ -27,15 +63,15 @@ LDAP.bind = function (client, username, password, email, request, settings) {
     var serverDn = serverDNs[k].split(/,?DC=/).slice(1).join('.');
     var userDn = (email) ? username : username + '@' + serverDn;
 
-    console.log ('Trying to bind ' + userDn + '...');
+    LDAP.log ('Trying to bind ' + userDn + '...');
 
     var bindFuture = new Future();
     client.bind(userDn, password, function (err) {
-      console.log ('Callback from binding LDAP:');
+      LDAP.log ('Callback from binding LDAP:');
       if (err) {
-        console.log(err);
-        console.log('LDAP bind failed with error');
-        console.log({dn: err.dn, code: err.code, name: err.name, message: err.message});
+        LDAP.log(err);
+        LDAP.log('LDAP bind failed with error');
+        LDAP.log({dn: err.dn, code: err.code, name: err.name, message: err.message});
         bindFuture.return(false);
       } else {
         bindFuture.return(true);
@@ -53,10 +89,10 @@ LDAP.bind = function (client, username, password, email, request, settings) {
   return ;
 };
 
-LDAP.search = function (client, searchUsername, email, request, settings) {
+LDAP._search = function (client, searchUsername, isEmail, request, settings) {
   // Search our previously bound connection. If the LDAP client isn't bound, this should throw an error.
   var opts = {
-    filter: LDAP.filter.call(null, email, searchUsername),
+    filter: LDAP.filter.call(null, isEmail, searchUsername),
     scope: 'sub',
     timeLimit: 2
   };
@@ -65,7 +101,7 @@ LDAP.search = function (client, searchUsername, email, request, settings) {
   for (var k in serverDNs) {
     var searchFuture = new Future();
     var serverDn = serverDNs[k];
-    console.log ('Searching '+serverDn);
+    LDAP.log ('Searching '+serverDn);
     client.search(serverDn, opts, function(err, res) {
       userObj = {};
       if (err) {
@@ -75,31 +111,38 @@ LDAP.search = function (client, searchUsername, email, request, settings) {
         res.on('searchEntry', function(entry) {
           var person = entry.object;
           var usernameOrEmail = searchUsername.toLowerCase();
-          var username = (email) ? person.cn || usernameOrEmail.split('@')[0] : usernameOrEmail;
-          var email = (email) ? usernameOrEmail : person.mail || username + '@' + serverDn.split(/,?DC=/).slice(1).join('.');
+          var username = (isEmail) ? person.cn || usernameOrEmail.split('@')[0] : usernameOrEmail;
+          var email = (isEmail) ? usernameOrEmail : person.mail || username + '@' + serverDn.split(/,?DC=/).slice(1).join('.');
           userObj = {
             username: username,
             email: email,
             password: request.password,
             profile: _.pick(entry.object, _.without(settings.whiteListedFields, 'mail'))
           };// _.extend({username: username, email : [{address: email, verified: LDAP.autoVerifyEmail}]}, _.pick(entry.object, _.without(settings.whiteListedFields, 'mail')));
+		  // An app may wish to add some fields based on the object returned from the LDAP server
+		  if (LDAP.multitenantIdentifier) {
+			if (request.data && request.data[LDAP.multitenantIdentifier]) {
+			  userObj.ldapIdentifier = request.data[LDAP.multitenantIdentifier] + '-' + username;
+			}
+		  }
+		  userObj = _.extend(userObj, LDAP.addFields.call(request, entry.object));
           searchFuture.return(userObj); 
         });
         res.on('searchReference', function (referral) {
-          console.log('referral: ' + referral.uris.join());
+          LDAP.log('referral: ' + referral.uris.join());
           searchFuture.return(false);
         });
         res.on('error', function(err) {
-          console.error('error: ' + err.message);
+          LDAP.error('error: ' + err.message);
           searchFuture.return(false);
         });
         res.on('end', function(result) {
           if (_.isEmpty(userObj)) {
             //Our LDAP server gives no indication that we found no entries for our search, so we have to make sure our object isn't empty.
-            console.log("No result found.");
+            LDAP.log("No result found.");
             searchFuture.return(false);
           }
-          console.log('status: ' + result.status);
+          LDAP.log('status: ' + result.status);
         });
       }
     });
@@ -109,9 +152,10 @@ LDAP.search = function (client, searchUsername, email, request, settings) {
     }
   }
   //If we're in debugMode, return an object with just the username. If not, return null to indicate no result was found.
-  if(settings.debugMode === true) {
+  if (settings.debugMode === true) {
     return {username: searchUsername.toLowerCase()};
-  } else {
+  }
+  else {
     return null;
   }
 };
@@ -119,6 +163,10 @@ LDAP.search = function (client, searchUsername, email, request, settings) {
 Accounts.registerLoginHandler("ldap", function (request) {
   if (!request.ldap) {
     return;  
+  }
+  if (LDAP.multitenantIdentifier && !(request.data && request.data[LDAP.multitenantIdentifier])) {
+	LDAP.log('You need to set "' + LDAP.multitenantIdentifier + '" on the client using LDAP.data for multi-tenant support to work.');
+	return;  
   }
   var username = request.username.toLowerCase();
   // Check if this is an email or a username
@@ -133,13 +181,23 @@ Accounts.registerLoginHandler("ldap", function (request) {
     // for a complete implementation
     var fieldName;
     var fieldValue;
-    if (!email) {
-      fieldName = 'username';
-      fieldValue = request.username;
+	if (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) {
+	  // Making a big assumption here that username and email address text (before the @) are the same
+	  // it's the best we can do and it doesn't matter too much if we're wrong
+	  // It just means we're going to have to hit the LDAP server again instead of the app db
+      var actualUsername = (email) ? username.split('@')[0] : username;
+	  fieldName = 'ldapIdentifier';
+	  fieldValue = request.data[LDAP.multitenantIdentifier] + '-' + actualUsername;
     }
-    else {
-      fieldName = 'emails.address';
-      fieldValue = request.username; // yes, `request.username` is actually an email address
+	else {
+	  if (!email) {
+		fieldName = 'username';
+		fieldValue = username;
+	  }
+	  else {
+		fieldName = 'emails.address';
+		fieldValue = username; // yes, `username` is actually an email address
+	  }
     }
     var selector = {};
     selector[fieldName] = fieldValue;
@@ -152,18 +210,18 @@ Accounts.registerLoginHandler("ldap", function (request) {
     }
   }
   request.password = request.pwd; // Dodging the Accounts.loginWithPassword check
-  var settings = LDAP.settings(request);
+  var settings = LDAP._settings(request);
   if (!settings) {
     throw new Error("LDAP settings missing.");
   }
   if (settings.debugMode === true) {
-    userObj = {username: username};
+    userObj = {username: actualUsername};
   }
   else {
-    console.log('LDAP authentication for ' + request.username);
-    var client = LDAP.createClient(settings.serverUrl);
-    LDAP.bind(client, request.username, request.password, email, request, settings);
-    userObj = LDAP.search(client, request.username, email, request, settings);
+    LDAP.log('LDAP authentication for ' + request.username);
+    var client = LDAP._createClient(settings.serverUrl);
+    LDAP._bind(client, request.username, request.password, email, request, settings);
+    userObj = LDAP._search(client, request.username, email, request, settings);
     client.unbind();
   }
 
@@ -178,7 +236,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
   // If we have two users with the same username, or two users with the same email address, we have a problem
   // For situations like this, we might want to modify the condition to include extra fields
   // Possibly based on request.data passed from the client
-  condition = LDAP.modifyCondition(condition);
+  condition = (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) ? {ldapIdentifier: request.data[LDAP.multitenantIdentifier] + '-' + userObj.username} : LDAP.modifyCondition.call(request, condition);
   var user = Meteor.users.findOne(condition);
   if (user) {
     userId = user._id;
@@ -186,6 +244,20 @@ Accounts.registerLoginHandler("ldap", function (request) {
   }
   else {
     userId = Accounts.createUser(userObj); // Meteor.users.insert(userObj);
+	if (userId && userObj) {
+	  delete userObj.username;
+	  delete userObj.email;
+	  delete userObj.password;
+	  delete userObj.profile;
+	  // Because Accounts.createUser only accepts username, email, password and profile fields
+	  if (!_.isEmpty(userObj)) {
+	    Meteor.users.update({_id: userId}, {$set: userObj}, function (err, res) {
+		  if (err) {
+			LDAP.log(err);  
+		  }
+		});
+	  }
+	}
   }
   if (settings.autopublishFields) {
     Accounts.addAutopublishFields({
@@ -204,16 +276,6 @@ Accounts.registerLoginHandler("ldap", function (request) {
 });
 
 // Don't overwrite this
-LDAP.settings = function (request) {
+LDAP._settings = function (request) {
   return LDAP.generateSettings(request) || Meteor.settings.ldap;
-}
-
-// Overwrite this function to produce settings based on the incoming request
-LDAP.generateSettings = function (request) {
-  return null;    
-}
-
-// Overwrite this function to modify the condition used to find an existing user
-LDAP.modifyCondition = function (condition) {
-  return condition;    
 }
