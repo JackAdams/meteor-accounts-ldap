@@ -102,13 +102,13 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
     var searchFuture = new Future();
     var serverDn = serverDNs[k];
     LDAP.log ('Searching '+serverDn);
-    client.search(serverDn, opts, function(err, res) {
+    client.search(serverDn, opts, Meteor.bindEnvironment(function(err, res) {
       userObj = {};
       if (err) {
         searchFuture.return(500);
       }
       else {
-        res.on('searchEntry', function(entry) {
+        res.on('searchEntry', Meteor.bindEnvironment(function(entry) {
           var person = entry.object;
           var usernameOrEmail = searchUsername.toLowerCase();
           var username = (isEmail) ? person.cn || usernameOrEmail.split('@')[0] : usernameOrEmail;
@@ -127,7 +127,7 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
 		  }
 		  userObj = _.extend(userObj, LDAP.addFields.call(request, entry.object));
           searchFuture.return(userObj); 
-        });
+        }));
         res.on('searchReference', function (referral) {
           LDAP.log('referral: ' + referral.uris.join());
           searchFuture.return(false);
@@ -145,7 +145,7 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
           LDAP.log('status: ' + result.status);
         });
       }
-    });
+    }));
     result = searchFuture.wait();
     if (result) {
       return result;
