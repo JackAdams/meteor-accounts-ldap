@@ -13,7 +13,7 @@ The things that this package does differently from `hive:accounts-ldap` are:
 - user data (email address, etc.) is stored in the same format as that of the core package `accounts-password`
 - users can authenticate using either username or email address
 - LDAP settings can be set programatically or using a `settings.json` file
-- package can peacefully co-exist with the core `accounts-password` package
+- this package can peacefully co-exist with the core `accounts-password` package
 - there are hooks and methods that can be used for multi-tenant apps that store ldap connection info in collections
 
 #### Installation
@@ -28,7 +28,7 @@ Your server's URL and a DN or DNs to search will need to be set in a settings.js
 {
   "ldap": {
     "serverDn": "DC=ad,DC=university,DC=edu",
-    "serverUrl": "ldap://ad.university.edu:2222",
+    "serverUrl": "ldap://ad.university.edu:389",
     "whiteListedFields": [ "displayName", "givenName", "department", "employeeNumber", "mail", "title", "address", "phone", "memberOf"],
     "autopublishFields": [ "displayName", "department", "mail", "title", "address", "phone"]
   }
@@ -113,6 +113,14 @@ LDAP.log: function (message) {
 }
 ```
 
+This is a hook you can use when a user successfully signs in using LDAP (doesn't fire if the sign-in is via the app database if using `LDAP.tryDBFirst`)
+```
+LDAP.onSignIn(function (userDocument, userData, ldapEntry) {
+  // Do things to user document like Roles.removeUsersFromRoles(userDocument, 'admin')
+});
+```
+The purpose of this hook is to let the app modify a user document if it finds conditions have changed on the LDAP server (e.g. the user is no longer an admin or has left the organization) and it needs to mirror this in its own db document(s). `this` in the function is the sign in request (an object) sent from the client, which contains the plain text password, as does the `userData` parameter. `userDoc`, `userData`, and `ldapEntry` are all objects.
+
 Overwrite this function **on the server** to modify the condition used to find an existing user:
 
 ```
@@ -141,7 +149,7 @@ LDAP.multitenantIdentifier = 'tenant_id';
 ```
 where `'tenant_id'` is a string that gives the name of a key from `request.data`, as sent from the client using `LDAP.data` (see above). The value associated with this key must be a unique id value for the tenant.
 
-**Note:** if you use `LDAP.multitenantIdentifier`, then `LDAP.modifyCondition` will have no effect, as the package will create the identifier for you. Also, a new field `ldapIdentifier` will be added to each document added to the `users` (`Meteor.users`) collection by this package.
+**Note:** if you use `LDAP.multitenantIdentifier`, then `LDAP.modifyCondition` will have no effect, as the package will create the user identifier for you. Also, a new field `ldapIdentifier` will be added to each document added to the `users` (`Meteor.users`) collection by this package.
 
 Full example:
 _Client_
@@ -158,7 +166,6 @@ LDAP.multitenantIdentifier = 'tenant_id';
 ```
 
 Overwrite this function **on the server** to add custom fields to the new user document created when a user from the LDAP directory isn't found in the Meteor app's database (based on the condition above):
-
 ```
 LDAP.addFields = function (person) {
   // `this` is the request from the client
@@ -167,6 +174,16 @@ LDAP.addFields = function (person) {
   return {};	
 }
 ```
+
+The following hook can be used **on the server**:
+```
+LDAP.onAddMultitenantIdentifier(function (ldapIdentifier, userDocument, userData) {
+  // Do things to user document like Roles.setUserRoles(userDocument, 'admin', 'foo-organization')
+});
+```
+The reason for this is that when an existing user sucsessfully signs into a different tenant in an app with `LDAP.multitenantIdentifier` set, this package will add a new value to the array in the `ldapIdentifier` field, but it won't deal with any of the extra fields created using `LDAP.addFields` (as these may have only been for new account creation).  However, if the app needs to update the user document due to the fact that this is the first time a user has signed in to this particular tenant (e.g. to add roles in this tenant's context), then this hook is available.
+
+**Note:** the `userData` parameter contains the plain text password, so be careful what you do with the userData object.  For instance, don't stringify and log it somewhere insecure!
 
 #### Built in UI
 
@@ -183,3 +200,124 @@ Password is sent from client to server in plain text.  Only use this package in 
   - `alwaysOpen` - to make the form automatically open
   - `loggedOutLinkTemplate` - to replace the default link that you click to open the form
   - `loggedInLinkTemplate` - to replace the default link that you click to get the dropdown once logged in
+  
+#### Example code
+
+_From an actual multi-tenant app (where 'tenants' are called 'organizations')._
+
+###### Client
+
+```
+LDAP.data = function () {
+  return {organization_id: App.state.get('organization_id') || null};  
+}
+```
+
+###### Server
+
+```
+LDAP.logging = false;
+LDAP.tryDBFirst = true;
+
+LDAP.generateSettings = function (request) {
+  if (request.data && request.data.organization_id) {
+	var organization_id = request.data.organization_id;
+	check(organization_id, String);
+	var organization = Organizations.findOne({_id: organization_id});
+	if (organization.ldap) {
+	  var ldapSettings = organization.ldap;
+	  return {
+		"serverDn": ldapSettings.serverDn,
+		"serverUrl": ldapSettings.serverUrl,
+		"whiteListedFields": [ldapSettings.displayNameField || "displayName"],
+		"autopublishFields": []
+	  };
+	}
+  }
+  return null;  
+}
+
+LDAP.multitenantIdentifier = 'organization_id';
+
+LDAP.onAddMultitenantIdentifier(function (addedIdentifier, userDoc, userData) {
+  // `this` is the request object if we need it
+  // currentOrganization needs to be set and so do roles
+  var updates = {};
+  if (userData && userData.currentOrganization) {
+	// The relevant userData was set by the LDAP.addFields function below
+	// But the user already existed, so roles and 
+	Meteor.users.update({_id: userDoc._id}, {$set: {currentOrganization: userData.currentOrganization}}); 
+	if (userData && userData.roles && userData.roles[userData.currentOrganization]) {
+	  Roles.addUsersToRoles(userDoc._id, userData.roles[userData.currentOrganization], userData.currentOrganization);
+	}
+  }
+});
+
+LDAP.addFields = function (person) {
+  var newUserFields = {};
+  var organization_id = this.data && this.data.organization_id;
+  if (organization_id) {
+    newUserFields.currentOrganization = organization_id;
+	if (userIsLeader(person, organization_id)) {
+	  // This is sidestepping the roles package Roles.addUsersToRole function, but has the same effect
+	  // The reason for this is, the user doesn't exist yet! (So we can't add roles to them.)
+	  var roles = {};
+	  roles[organization_id] = ["leader"];
+	  newUserFields.roles = roles;
+	}
+  }
+  return newUserFields;
+}
+
+LDAP.onSignIn(function (user, userData, ldapEntry) {
+  // `this` is the request sent
+  // Check whether the user is still a leader or has become a leader and act accordingly
+  // Not much point to this, while LDAP.tryDBFirst = true; as onSignIn only fires when the LDAP server is hit
+  // And it should never get hit again in subsequent sign ons unless the user changes organizations
+  var person = ldapEntry;
+  var isReallyLeader = userIsLeader(person, user.currentOrganization);
+  var isLeaderinApp = Roles.userIsInRole(user, 'leader', user.currentOrganization);
+  // If the person has stopped being a leader
+  if (isLeaderinApp && !isReallyLeader) {
+    Roles.removeUsersFromRoles(user, 'leader', user.currentOrganization);
+  }
+  if (!isLeaderinApp && isReallyLeader) {
+	Roles.setUserRoles(user, 'leader', user.currentOrganization);  
+  }
+});
+
+// LDAP specific function, which is why it's in this file
+var userIsLeader = function (person, organization_id) {
+  var leader = false;
+  // Need to parse the LDAP object and determine whether this person is a leader in the organization
+  if (organization_id) {
+	var organization = Organizations.findOne({_id: organization_id});
+	if (person.dn && organization && organization.ldap && organization.ldap.leaderDnContains && _.isArray(organization.ldap.leaderDnContains)) {
+	  var leader = _.reduce(organization.ldap.leaderDnContains, function (memo, searchString) {
+		if (person.dn.indexOf(searchString) === -1) {
+		  memo = false;	
+		}
+		return memo;
+	  }, true);
+	}
+  }
+  return leader;
+}
+```
+
+Documents from the `Organizations` collection look like this:
+
+```
+{
+  "_id": "45JE8Q6zufss7Fwzx"
+  "name": "My Organization",
+  "ldap": {
+    "serverDn": "OU=people,OU=we_like,DC=myorganization,DC=com",
+    "serverUrl": "ldap://pdc.myorganization.com:389",
+    "leaderDnContains": [
+      "Leader",
+      "Currently_Active"
+    ]
+  }
+}
+```
