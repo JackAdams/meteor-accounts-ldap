@@ -10,6 +10,7 @@ This is a package to implement authentication against an LDAP server and retriev
 The things that this package does differently from `hive:accounts-ldap` are:
 
 - UI matches that of the core package `accounts-ui`
+- the UI can be replaced by adding another package
 - user data (email address, etc.) is stored in the same format as that of the core package `accounts-password`
 - users can authenticate using either username or email address
 - LDAP settings can be set programatically or using a `settings.json` file
@@ -22,7 +23,7 @@ The things that this package does differently from `hive:accounts-ldap` are:
 
 #### Usage
 
-Your server's URL and a DN or DNs to search will need to be set in a settings.json file as `serverUrl` and `serverDn`, respectively. In addition, you can select an array of `whiteListedFields` from an LDAP search to add to the user.profile field in the document created in `Meteor.users` . An example for the settings.json file is:
+Your server's URL and a DN or DNs to search will need to be set in a settings.json file as `serverUrl` and `serverDn`, respectively. In addition, you can select an array of `whiteListedFields` from an LDAP search to add to the `user.profile` field in the document created in `Meteor.users` . An example for the settings.json file is:
 
 ```
 {
@@ -113,13 +114,13 @@ LDAP.log: function (message) {
 }
 ```
 
-This is a hook you can use when a user successfully signs in using LDAP (doesn't fire if the sign-in is via the app database if using `LDAP.tryDBFirst`)
+This is a hook you can use **on the server** when a user successfully signs in using LDAP (doesn't fire if the sign in is via the app database when using `LDAP.tryDBFirst`)
 ```
 LDAP.onSignIn(function (userDocument, userData, ldapEntry) {
   // Do things to user document like Roles.removeUsersFromRoles(userDocument, 'admin')
 });
 ```
-The purpose of this hook is to let the app modify a user document if it finds conditions have changed on the LDAP server (e.g. the user is no longer an admin or has left the organization) and it needs to mirror this in its own db document(s). `this` in the function is the sign in request (an object) sent from the client, which contains the plain text password, as does the `userData` parameter. `userDoc`, `userData`, and `ldapEntry` are all objects.
+The purpose of this hook is to let the app modify a user document if it finds conditions have changed on the LDAP server (e.g. the user is no longer an admin or has left the organization) and it needs to mirror this in its own db document(s). `this` in the function is the sign in request (an object) sent from the client (which contains the plain text password, as does the `userData` parameter). `userDoc`, `userData`, and `ldapEntry` are all objects.
 
 Overwrite this function **on the server** to modify the condition used to find an existing user:
 
@@ -132,11 +133,10 @@ The condition passed to this function is of the form:
 ```
 {emails: {$elemMatch: {address: <emailAddress>}}};
 ```
-if an email address was typed in the login form on the client, or
+if an email address was typed in the login form on the client, or, if a username was typed in the login form on the client, it is of this form:
 ```
 {username: <username>}
 ```
-if a username was typed in the login form on the client.
 
 A similar search condition should be returned by the function. `this` in this function's context is the request object received from the client.
 
@@ -149,9 +149,10 @@ LDAP.multitenantIdentifier = 'tenant_id';
 ```
 where `'tenant_id'` is a string that gives the name of a key from `request.data`, as sent from the client using `LDAP.data` (see above). The value associated with this key must be a unique id value for the tenant.
 
-**Note:** if you use `LDAP.multitenantIdentifier`, then `LDAP.modifyCondition` will have no effect, as the package will create the user identifier for you. Also, a new field `ldapIdentifier` will be added to each document added to the `users` (`Meteor.users`) collection by this package.
+**Note:** if you use `LDAP.multitenantIdentifier`, then `LDAP.modifyCondition` will have no effect, as the package will create the user identifier for you. Also, a new field `ldapIdentifier` will be added to each document added to the `Meteor.users` collection by this package.
 
 Full example:
+
 _Client_
 ```
 LDAP.data = function () {
@@ -165,7 +166,7 @@ _Server_
 LDAP.multitenantIdentifier = 'tenant_id';
 ```
 
-Overwrite this function **on the server** to add custom fields to the new user document created when a user from the LDAP directory isn't found in the Meteor app's database (based on the condition above):
+Overwrite the function below **on the server** to add custom fields to the new user document created when a user from the LDAP directory isn't found in the Meteor app's database (based on the 'condition' discussed above):
 ```
 LDAP.addFields = function (person) {
   // `this` is the request from the client
@@ -181,7 +182,7 @@ LDAP.onAddMultitenantIdentifier(function (ldapIdentifier, userDocument, userData
   // Do things to user document like Roles.setUserRoles(userDocument, 'admin', 'foo-organization')
 });
 ```
-The reason for this is that when an existing user sucsessfully signs into a different tenant in an app with `LDAP.multitenantIdentifier` set, this package will add a new value to the array in the `ldapIdentifier` field, but it won't deal with any of the extra fields created using `LDAP.addFields` (as these may have only been for new account creation).  However, if the app needs to update the user document due to the fact that this is the first time a user has signed in to this particular tenant (e.g. to add roles in this tenant's context), then this hook is available.
+The reason for this hook's existence is that when an existing user sucsessfully signs into a different tenant in an app that has `LDAP.multitenantIdentifier` set, this package will add a new value to the array in the `ldapIdentifier` field, but it won't deal with any of the extra fields created using `LDAP.addFields` (as these may have only been for new account creation).  However, if the app needs to update the user document due to the fact that this is the first time a user has signed in to this particular tenant (e.g. to add roles in this tenant's context), then this hook is available.
 
 **Note:** the `userData` parameter contains the plain text password, so be careful what you do with the userData object.  For instance, don't stringify and log it somewhere insecure!
 
@@ -193,6 +194,8 @@ The reason for this is that when an existing user sucsessfully signs into a diff
 
 Password is sent from client to server in plain text.  Only use this package in conjunction with SSL.
 
+Although this package supports multi-tenancy, where each tenant has their own LDAP server, the connection between Meteor app server and LDAP server is unencrypted (waiting on a new version of `ldapjs` that supports TLS). Because plain text passwords are sent from the app to the LDAP server, you really shouldn't use this package in any app that sits outside the corporate firewall!
+
 #### TODO
 
 - make the sign in form more configurable with options like:
@@ -200,10 +203,12 @@ Password is sent from client to server in plain text.  Only use this package in 
   - `alwaysOpen` - to make the form automatically open
   - `loggedOutLinkTemplate` - to replace the default link that you click to open the form
   - `loggedInLinkTemplate` - to replace the default link that you click to get the dropdown once logged in
+- work on securing traffic from client through to LDAP server
+- automated testing
   
 #### Example code
 
-_From an actual multi-tenant app (where 'tenants' are called 'organizations')._
+_From a working multi-tenant app (where 'tenants' are called 'organizations')._
 
 ###### Client
 

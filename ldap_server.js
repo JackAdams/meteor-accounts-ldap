@@ -1,9 +1,9 @@
 LDAP = {
   logging: true,
   log: function (message) {
-	if (LDAP.logging) {
-	  console.log(message);
-	}
+    if (LDAP.logging) {
+      console.log(message);
+    }
   },
   multitenantIdentifier: ''
 }; // { autoVerifyEmail : false };
@@ -26,7 +26,7 @@ LDAP.addFields = function (entry) {
   // `this` is the request from the client
   // `entry` is the object returned from the LDAP server
   // return the fields that are to be added when creating a user
-  return {};	
+  return {};    
 }
 
 // Overwrite this function to produce settings based on the incoming request
@@ -59,10 +59,10 @@ LDAP._callbacks = {
 
 LDAP._addCallback = function (callback, target) {
   if (_.isFunction(callback)) {
-	LDAP._callbacks[target].push(callback);
+    LDAP._callbacks[target].push(callback);
   }
   else {
-	throw new Meteor.Error(target + ' callback must be a function');  
+    throw new Meteor.Error(target + ' callback must be a function');  
   }
 }
 
@@ -90,15 +90,15 @@ LDAP._createClient = function(serverUrl) {
 
   var tlsFuture = new Future();
   client.starttls(function (err) {
-	LDAP.log ('Callback from starting TLS for LDAP:');
-	if (err) {
-	  LDAP.log(JSON.stringify(err));
-	  LDAP.log('LDAP TLS startup failed with error');
-	  LDAP.log(JSON.stringify({dn: err.dn, code: err.code, name: err.name, message: err.message}));
-	  tlsFuture.return(false);
-	} else {
-	  tlsFuture.return(true);
-	}
+    LDAP.log ('Callback from starting TLS for LDAP:');
+    if (err) {
+      LDAP.log(JSON.stringify(err));
+      LDAP.log('LDAP TLS startup failed with error');
+      LDAP.log(JSON.stringify({dn: err.dn, code: err.code, name: err.name, message: err.message}));
+      tlsFuture.return(false);
+    } else {
+      tlsFuture.return(true);
+    }
   });
   success = tlsFuture.wait();
 
@@ -172,7 +172,7 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
             password: request.password,
             profile: _.pick(entry.object, _.without(settings.whiteListedFields, 'mail'))
           };
-		  // _.extend({username: username, email : [{address: email, verified: LDAP.autoVerifyEmail}]}, _.pick(entry.object, _.without(settings.whiteListedFields, 'mail')));
+          // _.extend({username: username, email : [{address: email, verified: LDAP.autoVerifyEmail}]}, _.pick(entry.object, _.without(settings.whiteListedFields, 'mail')));
           searchFuture.return({userObj: userObj, person: person, ldapIdentifierUsername: username}); 
         });
         res.on('searchReference', function (referral) {
@@ -212,8 +212,8 @@ Accounts.registerLoginHandler("ldap", function (request) {
     return;  
   }
   if (LDAP.multitenantIdentifier && !(request.data && request.data[LDAP.multitenantIdentifier])) {
-	LDAP.log('You need to set "' + LDAP.multitenantIdentifier + '" on the client using LDAP.data for multi-tenant support to work.');
-	return;  
+    LDAP.log('You need to set "' + LDAP.multitenantIdentifier + '" on the client using LDAP.data for multi-tenant support to work.');
+    return;  
   }
   var username = request.username.toLowerCase();
   // Check if this is an email or a username
@@ -228,23 +228,23 @@ Accounts.registerLoginHandler("ldap", function (request) {
     // for a complete implementation
     var fieldName;
     var fieldValue;
-	if (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) {
-	  // Making a big assumption here that username and email address text (before the @) are the same
-	  // it's the best we can do and it doesn't matter too much if we're wrong
-	  // It just means we're going to have to hit the LDAP server again instead of the app db
+    if (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) {
+      // Making a big assumption here that username and email address text (before the @) are the same
+      // it's the best we can do and it doesn't matter too much if we're wrong
+      // It just means we're going to have to hit the LDAP server again instead of the app db
       var actualUsername = (email) ? username.split('@')[0] : username;
-	  fieldName = 'ldapIdentifier';
-	  fieldValue = request.data[LDAP.multitenantIdentifier] + '-' + actualUsername;
+      fieldName = 'ldapIdentifier';
+      fieldValue = request.data[LDAP.multitenantIdentifier] + '-' + actualUsername;
     }
-	else {
-	  if (!email) {
-		fieldName = 'username';
-		fieldValue = username;
-	  }
-	  else {
-		fieldName = 'emails.address';
-		fieldValue = username; // yes, `username` is actually an email address
-	  }
+    else {
+      if (!email) {
+        fieldName = 'username';
+        fieldValue = username;
+      }
+      else {
+        fieldName = 'emails.address';
+        fieldValue = username; // yes, `username` is actually an email address
+      }
     }
     var selector = {};
     selector[fieldName] = fieldValue;
@@ -252,8 +252,8 @@ Accounts.registerLoginHandler("ldap", function (request) {
     if (user) {
       var res = Accounts._checkPassword(user, request.pwd);
       if (!res.error) {
-		LDAP.log('User successfully logged in from app database. LDAP server not used.');
-		LDAP.log('Set `LDAP.tryDBFirst = false` to always use LDAP server.');
+        LDAP.log('User successfully logged in from app database. LDAP server not used.');
+        LDAP.log('Set `LDAP.tryDBFirst = false` to always use LDAP server.');
         return res;
       }
     }
@@ -265,32 +265,32 @@ Accounts.registerLoginHandler("ldap", function (request) {
   }
   if (settings.debugMode === true) {
     userObj = {username: actualUsername};
-	person = {};
+    person = {};
   }
   else {
     LDAP.log('LDAP authentication for ' + request.username);
     var client = LDAP._createClient(settings.serverUrl);
-	// For when next version of ldapjs comes out
-	/*if (settings.TLS) {
-	  var tlsStarted = LDAP._starttls(client);
-	  if (!tlsStarted) {
-		LDAP.log('Not trying to bind to LDAP server.');
-		return;  
-	  }
-	}*/
+    // For when next version of ldapjs comes out
+    /*if (settings.TLS) {
+      var tlsStarted = LDAP._starttls(client);
+      if (!tlsStarted) {
+        LDAP.log('Not trying to bind to LDAP server.');
+        return;  
+      }
+    }*/
     LDAP._bind(client, request.username, request.password, email, request, settings);
     var returnData = LDAP._search(client, request.username, email, request, settings);
-	userObj = returnData.userObj;
-	person = returnData.person;
-	ldapIdentifierUsername = returnData.ldapIdentifierUsername;
+    userObj = returnData.userObj;
+    person = returnData.person;
+    ldapIdentifierUsername = returnData.ldapIdentifierUsername;
     client.unbind();
   }
   
   // Automatically add an ldapIdentifier in multitenant situations
   if (LDAP.multitenantIdentifier) {
-	if (request.data && request.data[LDAP.multitenantIdentifier]) {
-	  userObj.ldapIdentifier = [request.data[LDAP.multitenantIdentifier] + '-' + ldapIdentifierUsername];
-	}
+    if (request.data && request.data[LDAP.multitenantIdentifier]) {
+      userObj.ldapIdentifier = [request.data[LDAP.multitenantIdentifier] + '-' + ldapIdentifierUsername];
+    }
   }
   
   // An app may wish to add some fields based on the object returned from the LDAP server
@@ -315,70 +315,70 @@ Accounts.registerLoginHandler("ldap", function (request) {
   condition = (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) ? {ldapIdentifier: ldapIdentifier} : LDAP.modifyCondition.call(request, condition);
   var user = Meteor.users.findOne(condition);
   if (user) {
-	LDAP.log('User found in app database: '+ JSON.stringify(user));
+    LDAP.log('User found in app database: '+ JSON.stringify(user));
     userId = user._id;
     // Meteor.users.update(userId, {$set: userObj});
   }
   else {
-	LDAP.log('Creating user: ' + JSON.stringify(userObj));
-	var skip = false;
-	try {
+    LDAP.log('Creating user: ' + JSON.stringify(userObj));
+    var skip = false;
+    try {
       userId = Accounts.createUser(userObj); // Meteor.users.insert(userObj);
-	  user = Meteor.users.findOne({_id: userId});
-	}
-	catch (err) {
-	  if (err.error === 403 && userObj.email) {
-		// Email already exists
-		// the reason for this is that no user was found in the database based on the condition
-		// because the condition was using the multitenantIdentifier.
-		// i.e. the user was created without using the current organization's multitenantIdentifier
-		// Emails are unique to individual, so we will use the email address to get the user and
-		// we'll add the correct ldapIdentifier to the user document
-		// and fire a callback to let the app know that we've added a ldapIdentifier
-		LDAP.log('Account with this email already exists.');
-		if (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) {
-		  LDAP.log('Adding a new ldapIdentifier: ' + userObj.ldapIdentifier[0]);
-		  var condition = {};
-		  condition.emails = {$elemMatch: {address: userObj.email}};
-		  var user = Meteor.users.findOne(condition);
-		  if (user) {
-			var userId = user._id;
-			// Add the ldapIdentifier
-			Meteor.users.update({_id: userId}, {$addToSet: {ldapIdentifier: userObj.ldapIdentifier[0]}});
-		    LDAP.log('Fields added using LDAP.addFields will be ignored');
-		    skip = true;
-		    LDAP.log('Use LDAP.onAddMultitenantIdentifier to add or update fields as needed in this situation');
-		    _.each(LDAP._callbacks.onAddMultitenantIdentifier, function (callback) {
+      user = Meteor.users.findOne({_id: userId});
+    }
+    catch (err) {
+      if (err.error === 403 && userObj.email) {
+        // Email already exists
+        // the reason for this is that no user was found in the database based on the condition
+        // because the condition was using the multitenantIdentifier.
+        // i.e. the user was created without using the current organization's multitenantIdentifier
+        // Emails are unique to individual, so we will use the email address to get the user and
+        // we'll add the correct ldapIdentifier to the user document
+        // and fire a callback to let the app know that we've added a ldapIdentifier
+        LDAP.log('Account with this email already exists.');
+        if (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) {
+          LDAP.log('Adding a new ldapIdentifier: ' + userObj.ldapIdentifier[0]);
+          var condition = {};
+          condition.emails = {$elemMatch: {address: userObj.email}};
+          var user = Meteor.users.findOne(condition);
+          if (user) {
+            var userId = user._id;
+            // Add the ldapIdentifier
+            Meteor.users.update({_id: userId}, {$addToSet: {ldapIdentifier: userObj.ldapIdentifier[0]}});
+            LDAP.log('Fields added using LDAP.addFields will be ignored');
+            skip = true;
+            LDAP.log('Use LDAP.onAddMultitenantIdentifier to add or update fields as needed in this situation');
+            _.each(LDAP._callbacks.onAddMultitenantIdentifier, function (callback) {
               callback.call(request, ldapIdentifier, user, userObj);
-		    });
-		  }
-		  else {
-			throw new Error('Operation failed unexpectedly.', 'User found in LDAP server, but couldn\'t be found in Meteor app. Check user record in database.'); 
-		  }
-		}
-	  }
-	  else {
-		LDAP.log('Unable to create user');
-		console.log(err);  
-	  }
-	}
-	if (!skip) {
-	  LDAP.log('New user _id: ' + userId);
-	  if (userId && userObj) {
-		delete userObj.username;
-		delete userObj.email;
-		delete userObj.password;
-		delete userObj.profile;
-		// Because Accounts.createUser only accepts username, email, password and profile fields
-		if (!_.isEmpty(userObj)) {
-		  Meteor.users.update({_id: userId}, {$set: userObj}, function (err, res) {
-			if (err) {
-			  LDAP.log(err);  
-			}
-		  });
-		}
-	  }
-	}
+            });
+          }
+          else {
+            throw new Error('Operation failed unexpectedly.', 'User found in LDAP server, but couldn\'t be found in Meteor app. Check user record in database.'); 
+          }
+        }
+      }
+      else {
+        LDAP.log('Unable to create user');
+        console.log(err);  
+      }
+    }
+    if (!skip) {
+      LDAP.log('New user _id: ' + userId);
+      if (userId && userObj) {
+        delete userObj.username;
+        delete userObj.email;
+        delete userObj.password;
+        delete userObj.profile;
+        // Because Accounts.createUser only accepts username, email, password and profile fields
+        if (!_.isEmpty(userObj)) {
+          Meteor.users.update({_id: userId}, {$set: userObj}, function (err, res) {
+            if (err) {
+              LDAP.log(err);  
+            }
+          });
+        }
+      }
+    }
   }
   if (settings.autopublishFields) {
     Accounts.addAutopublishFields({
@@ -388,7 +388,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
   }
   // Fire onSignIn callbacks
   _.each(LDAP._callbacks.onSignIn, function (callback) {
-	callback.call(request, user, userObj, person);
+    callback.call(request, user, userObj, person);
   });
   var stampedToken = Accounts._generateStampedLoginToken();
   var hashStampedToken = Accounts._hashStampedToken(stampedToken);
