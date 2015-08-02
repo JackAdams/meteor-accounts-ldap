@@ -1,5 +1,6 @@
 LDAP = {
-  data : function () { return null; }
+  data : function () { return null; },
+  username : function () { return ''; }
 };
 
 var firstAttempt = new ReactiveVar(true);
@@ -51,6 +52,9 @@ Template.ldapLoginButtons.helpers({
   },
   template : function () {
     return !!Template[LDAP.customFormTemplate.get()] && LDAP.customFormTemplate.get() || "";
+  },
+  usernameOrEmail : function () {
+	return LDAP.username() || this.username || (this.emails && this.emails[0] && this.emails[0].address) || 'Authenticated user';
   }
 });
 

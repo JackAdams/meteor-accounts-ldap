@@ -323,7 +323,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
     LDAP.log('Creating user: ' + JSON.stringify(userObj));
     var skip = false;
     try {
-      userId = Accounts.createUser(userObj); // Meteor.users.insert(userObj);
+      userId = Accounts.createUser(userObj);
       user = Meteor.users.findOne({_id: userId});
     }
     catch (err) {

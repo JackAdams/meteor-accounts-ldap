@@ -33,11 +33,11 @@
   {{else}}
     <div id="login-buttons" class="login-buttons-dropdown-align-{{align}}">
       <div class="login-link-and-dropdown-list login-form-sign-in">
-        {{#if currentUser}}
-          <a id="logged-in-username" class="login-link-text">{{currentUser.username}} ▾</a>
+        {{#with currentUser}}
+          <a id="logged-in-username" class="login-link-text">{{usernameOrEmail}} ▾</a>
         {{else}}
           <a id="login-sign-in-link" class="login-link-text">Sign in ▾</a>
-        {{/if}}
+        {{/with}}
         {{#if showForm}}
           <div id="login-dropdown-list" class="accounts-dialog">
             <a class="login-close-text">Close</a>

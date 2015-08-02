@@ -68,6 +68,13 @@ You can send info from the client to the server via the request parameter by ove
 LDAP.data = function () { return null; };
 ```
 
+You can set a username to display for the logged in user by overwriting the following function:
+
+```
+LDAP.username = function () { return ''; };
+```
+If you don't overwrite it, `currentUser.username` will be used; or, if that isn't found, the first email address for that user; or, if that isn't found, "Authenticated user".
+
 The following are only used if you want to create a custom sign-in form:
 
 ```
