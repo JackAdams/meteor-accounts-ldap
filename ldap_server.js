@@ -177,17 +177,23 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
         });
         res.on('searchReference', function (referral) {
           LDAP.log('referral: ' + referral.uris.join());
-          searchFuture.return(false);
+          if (!searchFuture.isResolved()) {
+            searchFuture.return(false);
+          }
         });
         res.on('error', function(err) {
           LDAP.log('error: ' + err.message);
-          searchFuture.return(false);
+          if (!searchFuture.isResolved()) {
+            searchFuture.return(false);
+          }
         });
         res.on('end', function(result) {
           if (_.isEmpty(userObj)) {
             //Our LDAP server gives no indication that we found no entries for our search, so we have to make sure our object isn't empty.
             LDAP.log("No result found.");
-            searchFuture.return(false);
+            if (!searchFuture.isResolved()) {
+              searchFuture.return(false);
+            }
           }
           LDAP.log('status: ' + result.status);
         });
@@ -249,7 +255,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
     var selector = {};
     selector[fieldName] = fieldValue;
     var user = Meteor.users.findOne(selector);
-    if (user) {
+    if (user && user.services && user.services.password && user.services.password.bcrypt && request.pwd) {
       var res = Accounts._checkPassword(user, request.pwd);
       if (!res.error) {
         LDAP.log('User successfully logged in from app database. LDAP server not used.');
@@ -280,6 +286,10 @@ Accounts.registerLoginHandler("ldap", function (request) {
     }*/
     LDAP._bind(client, request.username, request.password, email, request, settings);
     var returnData = LDAP._search(client, request.username, email, request, settings);
+	if (!(returnData.userObj && returnData.person)) {
+	  LDAP.log('No record was returned via LDAP');
+	  return; // Login handlers need to return undefined if the login fails
+	}
     userObj = returnData.userObj;
     person = returnData.person;
     ldapIdentifierUsername = returnData.ldapIdentifierUsername;
@@ -399,3 +409,4 @@ Accounts.registerLoginHandler("ldap", function (request) {
     tokenExpires: Accounts._tokenExpiration(hashStampedToken.when)
   };
 });
+    
