@@ -7,3 +7,5 @@ standard-app-packages
 autopublish
 insecure
 babrahams:accounts-ldap
+standard-minifiers
+babrahams:constellation

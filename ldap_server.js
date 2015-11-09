@@ -321,8 +321,13 @@ Accounts.registerLoginHandler("ldap", function (request) {
   // If we have two users with the same username, or two users with the same email address, we have a problem
   // For situations like this, we might want to modify the condition to include extra fields
   // Possibly based on request.data passed from the client
-  var ldapIdentifier = request.data[LDAP.multitenantIdentifier] + '-' + userObj.username
-  condition = (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) ? {ldapIdentifier: ldapIdentifier} : LDAP.modifyCondition.call(request, condition);
+  if (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) {
+	var ldapIdentifier = request.data[LDAP.multitenantIdentifier] + '-' + userObj.username;
+    condition = {ldapIdentifier: ldapIdentifier};
+  }
+  else {
+	condition = LDAP.modifyCondition.call(request, condition);
+  }
   var user = Meteor.users.findOne(condition);
   if (user) {
     LDAP.log('User found in app database: '+ JSON.stringify(user));

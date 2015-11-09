@@ -5,10 +5,10 @@ if (Meteor.isServer) {
   Meteor.startup(function () { console.log("LISTENING"); });*/
   
   // An example of how you can add fields when creating a user
-  Accounts.onCreateUser(function(options, user) {
+  /*Accounts.onCreateUser(function(options, user) {
     user.fieldFromOnCreateUser = true;
     return user;
-  });
+  });*/
   
   /*// An example of how you can receive data from the client when making a login request
   //   See below (Meteor.isClient) for the other half of the picture
