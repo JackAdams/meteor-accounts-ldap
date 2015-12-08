@@ -6,7 +6,7 @@ autopublish@1.0.4
 autoupdate@1.2.4
 babel-compiler@5.8.24_1
 babel-runtime@0.1.4
-babrahams:accounts-ldap@0.4.1
+babrahams:accounts-ldap@0.4.2
 babrahams:constellation@0.1.12
 babrahams:editable-json@0.6.1
 babrahams:temple@0.3.6

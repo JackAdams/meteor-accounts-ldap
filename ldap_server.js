@@ -12,10 +12,13 @@ LDAP = {
 // Public methods that may be optionally overwritten
 // *************************************************
 
+// This filter assumes that the part of the email address before the @ perfectly matches the cn value for each user
 // Overwrite this if you need a custom filter for your particular LDAP configuration
+// For example if everyone has the 'mail' field set, but the bit before the @ in the email address doesn't exactly match users' cn values, you could:
+// return '(&(' + ((isEmailAddress) ? 'mail' : 'cn') + '=' + usernameOrEmail + ')(objectClass=user))';
 
-LDAP.filter = function (email, username) {
-  return '(&(' + ((email) ? 'mail' : 'cn') + '=' + username + ')(objectClass=user))';
+LDAP.filter = function (isEmailAddress, usernameOrEmail) {
+  return '(&(cn=' + ((isEmailAddress) ? usernameOrEmail.split('@')[0] : usernameOrEmail) + ')(objectClass=user))';
 }
 
 // Flag to tell the loginHandler to have a poke at the app database first
@@ -114,7 +117,7 @@ LDAP._bind = function (client, username, password, email, request, settings) {
   var serverDNs = (typeof (settings.serverDn) == 'string') ? [settings.serverDn] : settings.serverDn;
   for (var k in serverDNs) {
     var serverDn = serverDNs[k].split(/,?DC=/).slice(1).join('.');
-    var userDn = (email) ? username : username + '@' + serverDn;
+    var userDn = ((email) ? username.split('@')[0] : username) + '@' + serverDn;
 
     LDAP.log ('Trying to bind ' + userDn + '...');
 
@@ -165,10 +168,10 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
           var person = entry.object;
           var usernameOrEmail = searchUsername.toLowerCase();
           var username = (isEmail) ? person.cn || usernameOrEmail.split('@')[0] : usernameOrEmail;
-          var email = (isEmail) ? usernameOrEmail : person.mail || username + '@' + serverDn.split(/,?DC=/).slice(1).join('.');
+          var email = username + '@' + serverDn.split(/,?DC=/).slice(1).join('.'); // (isEmail) ? usernameOrEmail : person.mail || 
           userObj = {
             username: username,
-            email: email,
+            email: (isEmail) ? usernameOrEmail : person.mail || email,
             password: request.password,
             profile: _.pick(entry.object, _.without(settings.whiteListedFields, 'mail'))
           };
@@ -224,9 +227,12 @@ Accounts.registerLoginHandler("ldap", function (request) {
   var username = request.username.toLowerCase();
   // Check if this is an email or a username
   var email = false;
-  if (/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/.test(username)) {
-     // It's an email
-     var email = true;  
+  var pieces = username.split('@');
+  if (pieces.length === 2) {
+	 if (pieces[1].indexOf('.') > 0) {
+       // It's an email
+       var email = true;
+	 }
   }
   if (!!Package["accounts-password"] && LDAP.tryDBFirst) {
     // This is a blunt instrument and not up to MDG standard

@@ -89,11 +89,16 @@ A full working implementation of a custom form is here:
 
 ##### Server
 
-You can create a custom filter by overwriting the `LDAP.filter` function **on the server** (if the default version, shown below, does not work for your particular LDAP configuration):
+You can create a custom search filter by overwriting the `LDAP.filter` function **on the server** (if the default version, shown below, does not work for your particular LDAP configuration):
 
 ```
-LDAP.filter = function (email, username) {
-  return '(&(' + ((email) ? 'mail' : 'cn') + '=' + username + ')(objectClass=user))';
+// This default search filter assumes that the part of the email address before the @ perfectly matches the cn value for each user
+// Overwrite this if you need a custom filter for your particular LDAP configuration
+// For example if everyone has the 'mail' field set, but the bit before the @ in the email address doesn't exactly match users' cn values, you could:
+// return '(&(' + ((isEmailAddress) ? 'mail' : 'cn') + '=' + usernameOrEmail + ')(objectClass=user))';
+
+LDAP.filter = function (isEmailAddress, usernameOrEmail) {
+  return '(&(cn=' + ((isEmailAddress) ? usernameOrEmail.split('@')[0] : usernameOrEmail) + ')(objectClass=user))';
 }
 ```
 
