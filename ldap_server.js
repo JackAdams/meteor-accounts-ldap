@@ -352,7 +352,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
     try {
 	  var allowedFields = ['username', 'email', 'password', 'profile'];
 	  var extraFields = [];
-	  userObj = _.filter(userObj, function (val, key) {
+	  var tempUserObj = _.filter(userObj, function (val, key) {
 		if (_.contains(allowedFields, key)) {
 		  return true;	
 		}
@@ -360,7 +360,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
 		  extraFields[key] = val;	
 		}
 	  });
-      userId = Accounts.createUser(userObj);
+      userId = Accounts.createUser(tempUserObj);
       user = Meteor.users.findOne({_id: userId});
 	  if (user) {
 	    Meteor.users.update({_id: userId}, {$set: extraFields});  

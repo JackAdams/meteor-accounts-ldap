@@ -2,7 +2,7 @@ accounts-base@1.2.2
 accounts-password@1.1.4
 babel-compiler@5.8.24_1
 babel-runtime@0.1.4
-babrahams:accounts-ldap@0.4.4
+babrahams:accounts-ldap@0.4.5
 base64@1.0.4
 binary-heap@1.0.4
 blaze@2.1.3
