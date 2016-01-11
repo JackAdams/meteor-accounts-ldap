@@ -89,6 +89,14 @@ A full working implementation of a custom form is here:
 
 ##### Server
 
+You can produce a custom bind value (value that is used with the user-submitted password to bind to the LDAP server) by overwriting this function:
+
+```
+LDAP.bindValue = function (username, isEmailAddress, serverDn) {
+  return ((isEmailAddress) ? username.split('@')[0] : username) + '@' + serverDn;
+}
+```
+
 You can create a custom search filter by overwriting the `LDAP.filter` function **on the server** (if the default version, shown below, does not work for your particular LDAP configuration):
 
 ```

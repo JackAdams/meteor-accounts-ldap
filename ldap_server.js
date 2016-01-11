@@ -12,6 +12,12 @@ LDAP = {
 // Public methods that may be optionally overwritten
 // *************************************************
 
+// This provides the value that is used along with the user-submitted password to bind to the LDAP server
+
+LDAP.bindValue = function (username, isEmailAddress, serverDn) {
+  return ((isEmailAddress) ? username.split('@')[0] : username) + '@' + serverDn;	
+}
+
 // This filter assumes that the part of the email address before the @ perfectly matches the cn value for each user
 // Overwrite this if you need a custom filter for your particular LDAP configuration
 // For example if everyone has the 'mail' field set, but the bit before the @ in the email address doesn't exactly match users' cn values, you could:
@@ -111,13 +117,13 @@ LDAP._createClient = function(serverUrl) {
   return success;
 };*/
 
-LDAP._bind = function (client, username, password, email, request, settings) {
+LDAP._bind = function (client, username, password, isEmail, request, settings) {
   var success = null;
   //Bind our LDAP client.
   var serverDNs = (typeof (settings.serverDn) == 'string') ? [settings.serverDn] : settings.serverDn;
   for (var k in serverDNs) {
     var serverDn = serverDNs[k].split(/,?DC=/).slice(1).join('.');
-    var userDn = ((email) ? username.split('@')[0] : username) + '@' + serverDn;
+    var userDn = LDAP.bindValue(username, isEmail, serverDn);
 
     LDAP.log ('Trying to bind ' + userDn + '...');
 
@@ -292,7 +298,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
     }*/
     LDAP._bind(client, request.username, request.password, email, request, settings);
     var returnData = LDAP._search(client, request.username, email, request, settings);
-	if (!(returnData.userObj && returnData.person)) {
+	if (!returnData || !(returnData.userObj && returnData.person)) {
 	  LDAP.log('No record was returned via LDAP');
 	  return; // Login handlers need to return undefined if the login fails
 	}
@@ -344,8 +350,21 @@ Accounts.registerLoginHandler("ldap", function (request) {
     LDAP.log('Creating user: ' + JSON.stringify(userObj));
     var skip = false;
     try {
+	  var allowedFields = ['username', 'email', 'password', 'profile'];
+	  var extraFields = [];
+	  userObj = _.filter(userObj, function (val, key) {
+		if (_.contains(allowedFields, key)) {
+		  return true;	
+		}
+		else {
+		  extraFields[key] = val;	
+		}
+	  });
       userId = Accounts.createUser(userObj);
       user = Meteor.users.findOne({_id: userId});
+	  if (user) {
+	    Meteor.users.update({_id: userId}, {$set: extraFields});  
+	  }
     }
     catch (err) {
       if (err.error === 403 && userObj.email) {
