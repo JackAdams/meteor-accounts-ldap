@@ -52,7 +52,7 @@ returning an object of the form:
 ```
 {
   "serverDn": "DC=ad,DC=university,DC=edu",
-  "serverUrl": "ldap://ad.university.edu:2222",
+  "serverUrl": "ldap://ad.university.edu:389",
   "whiteListedFields": [ "displayName", "givenName", "department", "employeeNumber", "mail", "title", "address", "phone", "memberOf"],
   "autopublishFields": [ "displayName", "department", "mail", "title", "address", "phone"]
 }
@@ -71,7 +71,7 @@ LDAP.data = function () { return null; };
 You can set a username to display for the logged in user by overwriting the following function:
 
 ```
-LDAP.username = function () { return ''; };
+LDAP.username = function (user) { return ''; };
 ```
 If you don't overwrite it, `currentUser.username` will be used; or, if that isn't found, the first email address for that user; or, if that isn't found, "Authenticated user".
 
@@ -89,35 +89,69 @@ A full working implementation of a custom form is here:
 
 ##### Server
 
-You can produce a custom bind value (value that is used with the user-submitted password to bind to the LDAP server) by overwriting this function:
+You can produce a custom bind value (value that is used with the user-submitted password to bind to the LDAP server) by overwriting this function **on the server**:
 
 ```
-LDAP.bindValue = function (username, isEmailAddress, serverDn) {
-  return ((isEmailAddress) ? username.split('@')[0] : username) + '@' + serverDn;
+LDAP.bindValue = function (usernameOrEmail, isEmailAddress, FQDN) {
+  return ((isEmailAddress) ? usernameOrEmail.split('@')[0] : usernameOrEmail) + '@' + FQDN;	
 }
 ```
 
 You can create a custom search filter by overwriting the `LDAP.filter` function **on the server** (if the default version, shown below, does not work for your particular LDAP configuration):
 
 ```
-// This default search filter assumes that the part of the email address before the @ perfectly matches the cn value for each user
+// This filter, used with default settings for LDAP.searchField assumes that the part of the email address before the @ perfectly matches the cn value for each user
 // Overwrite this if you need a custom filter for your particular LDAP configuration
-// For example if everyone has the 'mail' field set, but the bit before the @ in the email address doesn't exactly match users' cn values, you could:
-// return '(&(' + ((isEmailAddress) ? 'mail' : 'cn') + '=' + usernameOrEmail + ')(objectClass=user))';
+// For example if everyone has the 'mail' field set, but the bit before the @ in the email address doesn't exactly match users' cn values, you could do:
+// LDAP.filter = function (isEmailAddress, usernameOrEmail, FQDN) { return '(&(' + ((isEmailAddress) ? 'mail' : 'cn') + '=' + usernameOrEmail + ')(objectClass=user))'; }
 
-LDAP.filter = function (isEmailAddress, usernameOrEmail) {
-  return '(&(cn=' + ((isEmailAddress) ? usernameOrEmail.split('@')[0] : usernameOrEmail) + ')(objectClass=user))';
+LDAP.filter = function (isEmailAddress, usernameOrEmail, FQDN) {
+  var searchField = (_.isFunction(LDAP.searchField)) ? LDAP.searchField.call(this) : LDAP.searchField;
+  var searchValue = LDAP.searchValue.call(this, isEmailAddress, usernameOrEmail, FQDN);
+  return '(&(' + searchField + '=' + searchValue + ')(objectClass=user))';
+}
+
+LDAP.searchValue = function (isEmailAddress, usernameOrEmail, FQDN) {
+  var username = (isEmailAddress) ? usernameOrEmail.split('@')[0] : usernameOrEmail;
+  var searchValue;
+  var searchValueType = (_.isFunction(LDAP.searchValueType)) ? LDAP.searchValueType.call(this) : LDAP.searchValueType;
+  switch (searchValueType) {
+	case 'userPrincipalName' :
+	  searchValue = username + '@' + FQDN;
+	  break;
+	case 'email' :
+	  searchValue = (isEmailAddress) ? userNameOrEmail : username + '@' + FQDN; // If it's not an email address, we're kind of guessing
+	  break;
+	case 'username' :
+	default :
+	  searchValue = username;
+  }
+  return searchValue;
 }
 ```
 
-You can set
+If you don't need to overwrite the whole filter, you can just set the following **on the server** (for example in AD with the `userPrincipalName` values in the standard format for each user):
+
+```
+LDAP.searchField = 'userPrincipalName';
+LDAP.searchValueType = 'userPrincipalName';
+```
+
+The default settings are:
+
+```
+LDAP.searchField = 'cn';
+LDAP.searchValueType = 'username';
+```
+
+You can set `LDAP.searchField` and `LDAP.searchValueType` to be string values or functions that return string values.
+
+The three `LDAP.searchValueType` values that are built in are: `username`, `email`, and `userPrincipalName`.
 
 ```
 LDAP.tryDBFirst = true;
 ```
 **on the server** if you want the package to try and log the user in using the app database before hitting the LDAP server. (This is `false` by default.)
-
-You can set
 
 ```
 LDAP.logging = false;

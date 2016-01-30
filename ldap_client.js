@@ -1,6 +1,6 @@
 LDAP = {
   data : function () { return null; },
-  username : function () { return ''; }
+  username : function (user) { return ''; }
 };
 
 var firstAttempt = new ReactiveVar(true);
@@ -54,13 +54,13 @@ Template.ldapLoginButtons.helpers({
     return !!Template[LDAP.customFormTemplate.get()] && LDAP.customFormTemplate.get() || "";
   },
   usernameOrEmail : function () {
-	return LDAP.username() || this.username || (this.emails && this.emails[0] && this.emails[0].address) || 'Authenticated user';
+	return (_.isFunction(LDAP.username) && LDAP.username.call(this, this)) || this.username || (this.emails && this.emails[0] && this.emails[0].address) || 'Authenticated user';
   }
 });
 
 Template.ldapLoginButtons.events({
   'click .login-close-text' : function () {
-    showForm.set(false);  
+    showForm.set(false);
   },
   'click .login-link-text' : function () {
     showForm.set(true);

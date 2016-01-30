@@ -5,7 +5,9 @@ LDAP = {
       console.log(message);
     }
   },
-  multitenantIdentifier: ''
+  multitenantIdentifier: '',
+  searchField: 'cn',
+  searchValueType: 'username'
 }; // { autoVerifyEmail : false };
 
 // *************************************************
@@ -14,17 +16,37 @@ LDAP = {
 
 // This provides the value that is used along with the user-submitted password to bind to the LDAP server
 
-LDAP.bindValue = function (username, isEmailAddress, serverDn) {
-  return ((isEmailAddress) ? username.split('@')[0] : username) + '@' + serverDn;	
+LDAP.bindValue = function (usernameOrEmail, isEmailAddress, FQDN) {
+  return ((isEmailAddress) ? usernameOrEmail.split('@')[0] : usernameOrEmail) + '@' + FQDN;	
 }
 
-// This filter assumes that the part of the email address before the @ perfectly matches the cn value for each user
+// This filter, used with default settings for LDAP.searchField assumes that the part of the email address before the @ perfectly matches the cn value for each user
 // Overwrite this if you need a custom filter for your particular LDAP configuration
-// For example if everyone has the 'mail' field set, but the bit before the @ in the email address doesn't exactly match users' cn values, you could:
-// return '(&(' + ((isEmailAddress) ? 'mail' : 'cn') + '=' + usernameOrEmail + ')(objectClass=user))';
+// For example if everyone has the 'mail' field set, but the bit before the @ in the email address doesn't exactly match users' cn values, you could do:
+// LDAP.filter = function (isEmailAddress, usernameOrEmail, FQDN) { return '(&(' + ((isEmailAddress) ? 'mail' : 'cn') + '=' + usernameOrEmail + ')(objectClass=user))'; }
 
-LDAP.filter = function (isEmailAddress, usernameOrEmail) {
-  return '(&(cn=' + ((isEmailAddress) ? usernameOrEmail.split('@')[0] : usernameOrEmail) + ')(objectClass=user))';
+LDAP.filter = function (isEmailAddress, usernameOrEmail, FQDN) {
+  var searchField = (_.isFunction(LDAP.searchField)) ? LDAP.searchField.call(this) : LDAP.searchField;
+  var searchValue = LDAP.searchValue.call(this, isEmailAddress, usernameOrEmail, FQDN);
+  return '(&(' + searchField + '=' + searchValue + ')(objectClass=user))';
+}
+
+LDAP.searchValue = function (isEmailAddress, usernameOrEmail, FQDN) {
+  var username = (isEmailAddress) ? usernameOrEmail.split('@')[0] : usernameOrEmail;
+  var searchValue;
+  var searchValueType = (_.isFunction(LDAP.searchValueType)) ? LDAP.searchValueType.call(this) : LDAP.searchValueType;
+  switch (searchValueType) {
+	case 'userPrincipalName' :
+	  searchValue = username + '@' + FQDN;
+	  break;
+	case 'email' :
+	  searchValue = (isEmailAddress) ? userNameOrEmail : username + '@' + FQDN; // If it's not an email address, we're kind of guessing
+	  break;
+	case 'username' :
+	default :
+	  searchValue = username;
+  }
+  return searchValue;
 }
 
 // Flag to tell the loginHandler to have a poke at the app database first
@@ -61,6 +83,10 @@ LDAP.onAddMultitenantIdentifier = function (callback) {
 // Private methods, not intended for app use
 // *****************************************
 
+LDAP._serverDnToFQDN = function (serverDn) {
+  return serverDn.toLowerCase().replace(/\s+/g, '').split(/,?dc=/).slice(1).join('.');
+}
+
 LDAP._callbacks = {
   onAddMultitenantIdentifier: [],
   onSignIn: []
@@ -91,6 +117,7 @@ LDAP._createClient = function(serverUrl) {
 };
 
 // If next version of ldapjs ever comes out
+// TODO - It's out! Update ldapjs version, then test and release this code!
 /*LDAP._starttls = function (client) {
   var success = null;
   
@@ -122,8 +149,8 @@ LDAP._bind = function (client, username, password, isEmail, request, settings) {
   //Bind our LDAP client.
   var serverDNs = (typeof (settings.serverDn) == 'string') ? [settings.serverDn] : settings.serverDn;
   for (var k in serverDNs) {
-    var serverDn = serverDNs[k].split(/,?DC=/).slice(1).join('.');
-    var userDn = LDAP.bindValue(username, isEmail, serverDn);
+    var FQDN = LDAP._serverDnToFQDN(serverDNs[k]);
+    var userDn = LDAP.bindValue.call(request, username, isEmail, FQDN);
 
     LDAP.log ('Trying to bind ' + userDn + '...');
 
@@ -154,7 +181,6 @@ LDAP._bind = function (client, username, password, isEmail, request, settings) {
 LDAP._search = function (client, searchUsername, isEmail, request, settings) {
   // Search our previously bound connection. If the LDAP client isn't bound, this should throw an error.
   var opts = {
-    filter: LDAP.filter.call(null, isEmail, searchUsername),
     scope: 'sub',
     timeLimit: 2
   };
@@ -163,6 +189,7 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
   for (var k in serverDNs) {
     var searchFuture = new Future();
     var serverDn = serverDNs[k];
+	opts.filter = LDAP.filter.call(request, isEmail, searchUsername, LDAP._serverDnToFQDN(serverDn));
     LDAP.log ('Searching ' + serverDn);
     client.search(serverDn, opts, function(err, res) {
       userObj = {};
@@ -173,8 +200,8 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
         res.on('searchEntry', function(entry) {
           var person = entry.object;
           var usernameOrEmail = searchUsername.toLowerCase();
-          var username = (isEmail) ? person.cn || usernameOrEmail.split('@')[0] : usernameOrEmail;
-          var email = username + '@' + serverDn.split(/,?DC=/).slice(1).join('.'); // (isEmail) ? usernameOrEmail : person.mail || 
+          var username = (isEmail) ? usernameOrEmail.split('@')[0] : usernameOrEmail; // Used to have: person.cn || usernameOrEmail.split('@')[0] -- guessing the username based on the email is pretty poor
+          var email = username + '@' + LDAP._serverDnToFQDN(serverDn); // (isEmail) ? usernameOrEmail : person.mail || 
           userObj = {
             username: username,
             email: (isEmail) ? usernameOrEmail : person.mail || email,
@@ -351,10 +378,11 @@ Accounts.registerLoginHandler("ldap", function (request) {
     var skip = false;
     try {
 	  var allowedFields = ['username', 'email', 'password', 'profile'];
-	  var extraFields = [];
-	  var tempUserObj = _.filter(userObj, function (val, key) {
+	  var extraFields = {};
+	  var tempUserObj = {};
+	  _.each(userObj, function (val, key) {
 		if (_.contains(allowedFields, key)) {
-		  return true;	
+		  tempUserObj[key] = val;	
 		}
 		else {
 		  extraFields[key] = val;	
