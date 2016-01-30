@@ -1,11 +1,19 @@
 Accounts LDAP - Changelog
 =========================
 
-### v1.0
+### v1.0 (Does not exist yet -- will be in the distant future)
 
 - Automated test suite
 - LDAPS support
-- Configurable enough to support most LDAP systems
+- Configurable enough to support most LDAP authentication scenarios
+
+### vNext
+
+- TLS support ?
+
+### v0.5.0
+
+- Makes the search filter more flexible without having to overwrite the `LDAP.filter` function
 
 ### v0.4.3
 
