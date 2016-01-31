@@ -1,7 +1,7 @@
 Accounts LDAP
 -------------
 
-Authentication against an LDAP server for Meteor.
+Authentication and account management for Meteor using LDAP.
 
 #### Overview
 
