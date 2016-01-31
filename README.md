@@ -5,7 +5,7 @@ Authentication and account management for Meteor using LDAP.
 
 #### Overview
 
-This is a package to implement authentication against an LDAP server and retrieval of user attributes from that server in Meteor. It is an adaptation of `hive:accounts-ldap`.
+This is a package to implement authentication against a separate directory server via LDAP and retrieval of user attributes from that server. It is an adaptation of `hive:accounts-ldap`.
 
 The things that this package does differently from `hive:accounts-ldap` are:
 
@@ -16,6 +16,7 @@ The things that this package does differently from `hive:accounts-ldap` are:
 - LDAP settings can be set programatically or using a `settings.json` file
 - this package can peacefully co-exist with the core `accounts-password` package
 - there are hooks and methods that can be used for multi-tenant apps that store ldap connection info in collections
+- there is more flexibility around the LDAP bind and search methods, allowing it to work with a range of different directory configurations
 
 #### Installation
 
@@ -62,7 +63,7 @@ returning an object of the form:
 
 ##### Client
 
-You can send info from the client to the server via the request parameter by overwriting the below function **on the client** whose return value will set the value of `request.data`:
+You can send info from the client to your app server via the request parameter by overwriting the below function **on the client** whose return value will set the value of `request.data`:
 
 ```
 LDAP.data = function () { return null; };
@@ -89,7 +90,7 @@ A full working implementation of a custom form is here:
 
 ##### Server
 
-You can produce a custom bind value (value that is used with the user-submitted password to bind to the LDAP server) by overwriting this function **on the server**:
+You can produce a custom bind value (value that is used with the user-submitted password to bind to the directory server via LDAP) by overwriting this function **on the server**:
 
 ```
 LDAP.bindValue = function (usernameOrEmail, isEmailAddress, FQDN) {
@@ -101,7 +102,7 @@ You can create a custom search filter by overwriting the `LDAP.filter` function 
 
 ```
 // This filter, used with default settings for LDAP.searchField assumes that the part of the email address before the @ perfectly matches the cn value for each user
-// Overwrite this if you need a custom filter for your particular LDAP configuration
+// Overwrite this if you need a custom filter for your particular directory server configuration
 // For example if everyone has the 'mail' field set, but the bit before the @ in the email address doesn't exactly match users' cn values, you could do:
 // LDAP.filter = function (isEmailAddress, usernameOrEmail, FQDN) { return '(&(' + ((isEmailAddress) ? 'mail' : 'cn') + '=' + usernameOrEmail + ')(objectClass=user))'; }
 
@@ -174,7 +175,7 @@ LDAP.onSignIn(function (userDocument, userData, ldapEntry) {
   // Do things to user document like Roles.removeUsersFromRoles(userDocument, 'admin')
 });
 ```
-The purpose of this hook is to let the app modify a user document if it finds conditions have changed on the LDAP server (e.g. the user is no longer an admin or has left the organization) and it needs to mirror this in its own db document(s). `this` in the function is the sign in request (an object) sent from the client (which contains the plain text password, as does the `userData` parameter). `userDoc`, `userData`, and `ldapEntry` are all objects.
+The purpose of this hook is to let the app modify a user document if it finds conditions have changed on the directory server (e.g. the user is no longer an admin or has left the organization) and it needs to mirror this in its own db document(s). `this` in the function is the sign in request (an object) sent from the client (which contains the plain text password, as does the `userData` parameter). `userDoc`, `userData`, and `ldapEntry` are all js objects.
 
 Overwrite this function **on the server** to modify the condition used to find an existing user:
 
@@ -220,7 +221,7 @@ _Server_
 LDAP.multitenantIdentifier = 'tenant_id';
 ```
 
-Overwrite the function below **on the server** to add custom fields to the new user document created when a user from the LDAP directory isn't found in the Meteor app's database (based on the 'condition' discussed above):
+Overwrite the function below **on the server** to add custom fields to the new user document created when a user from the directory server isn't found in the Meteor app's database (based on the 'condition' discussed above):
 ```
 LDAP.addFields = function (person) {
   // `this` is the request from the client
@@ -248,7 +249,7 @@ The reason for this hook's existence is that when an existing user sucsessfully 
 
 Password is sent from client to server in plain text.  Only use this package in conjunction with SSL.
 
-Although this package supports multi-tenancy, where each tenant has their own LDAP server, the connection between Meteor app server and LDAP server is unencrypted (waiting on a new version of `ldapjs` that supports TLS). Because plain text passwords are sent from the app to the LDAP server, you really shouldn't use this package in any app that sits outside the corporate firewall!
+Although this package supports multi-tenancy, where each tenant has their own directory server, the connection between Meteor app server and directory server is unencrypted (waiting on a new version of `ldapjs` that supports TLS) unless the directory server is using ssl - i.e. `ldaps://`. Because plain text passwords are sent from the app to the directory server, you really shouldn't use this package in any app that sits outside the corporate firewall!
 
 #### TODO
 
