@@ -4,12 +4,18 @@ Accounts LDAP - Changelog
 ### v1.0 (Does not exist yet -- will be in the distant future)
 
 - Automated test suite
-- LDAPS support
 - Configurable enough to support most LDAP authentication scenarios
 
 ### vNext
 
-- TLS support ?
+- Make UI part separate package
+
+### v0.6.0
+
+- Added overwriteable `LDAP.appUsername` function to make some multi-tenancy scenarios easier
+- Removed some accidental unnecessary globals
+- Renamed some variables for easier code readability
+- LDAPS support (copied approach from `typ:accounts-ldap`) -- untested
 
 ### v0.5.0
 

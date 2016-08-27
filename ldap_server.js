@@ -31,6 +31,11 @@ LDAP.filter = function (isEmailAddress, usernameOrEmail, FQDN) {
   return '(&(' + searchField + '=' + searchValue + ')(objectClass=user))';
 }
 
+// This is the search value that gets used in the LDAP.filter function above
+// which gets called from the LDAP._search function below, when trying to isolate a user
+// from the directory.
+// Overwrite so that it matches your specific directory structure
+
 LDAP.searchValue = function (isEmailAddress, usernameOrEmail, FQDN) {
   var username = (isEmailAddress) ? usernameOrEmail.split('@')[0] : usernameOrEmail;
   var searchValue;
@@ -52,6 +57,15 @@ LDAP.searchValue = function (isEmailAddress, usernameOrEmail, FQDN) {
 // Flag to tell the loginHandler to have a poke at the app database first
 // (will only work if accounts-password package is present)
 LDAP.tryDBFirst = false;
+
+// The default 
+LDAP.userLookupQuery = function (fieldName, fieldValue, isEmail, isMultitenantIdentifier) {
+  // Context (this) is the request sent from client
+  var selector = {};
+  selector[fieldName] = fieldValue;
+  // Must return a mongo selector -- e.g. {username: "jackadams"} or {"email.address": "example@example.com"}
+  return selector;
+}
 
 LDAP.addFields = function (entry) {
   // `this` is the request from the client
@@ -77,6 +91,14 @@ LDAP.onSignIn = function (callback) {
 
 LDAP.onAddMultitenantIdentifier = function (callback) {
   LDAP._addCallback(callback, 'onAddMultitenantIdentifier');
+}
+
+// Overwrite this function if the app needs to do something to modify the username of the users in the app database
+// i.e. the username field in the app is different from the username field in the directory accessed via LDAP
+LDAP.appUsername = function (userNameOrEmail, isEmail, userObj) {
+  // userObj is the best guess we've got for email and username, one of which successfully retrieved a user from the directory using LDAP
+  // `this` is the request received from the client
+  return (isEmail) ? userNameOrEmail.split('@')[0] : userNameOrEmail;	
 }
 
 // *****************************************
@@ -109,10 +131,23 @@ var ldap = Npm.require('ldapjs');
 var Future = Npm.require('fibers/future');
 var assert = Npm.require('assert');
 
-LDAP._createClient = function(serverUrl) {
-  var client = ldap.createClient({
-    url: serverUrl
-  });
+LDAP._createClient = function () {
+  var client = null;
+  var settings = this;
+  var serverUrl = settings.serverUrl;
+  if (serverUrl.indexOf('ldaps://') === 0 && settings.ldapsCertificate) {
+	client = ldap.createClient({
+	  url: serverUrl,
+	  tlsOptions: {
+		ca: [settings.ldapsCertificate]
+	  }
+	});
+  }
+  else {
+	client = ldap.createClient({
+      url: serverUrl
+    });
+  }
   return client;
 };
 
@@ -204,7 +239,7 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
           var email = username + '@' + LDAP._serverDnToFQDN(serverDn); // (isEmail) ? usernameOrEmail : person.mail || 
           userObj = {
             username: username,
-            email: (isEmail) ? usernameOrEmail : person.mail || email,
+            email: (isEmail) ? usernameOrEmail : person.mail || email, // best we can do with the info we have
             password: request.password,
             profile: _.pick(entry.object, _.without(settings.whiteListedFields, 'mail'))
           };
@@ -249,6 +284,7 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
   }
 };
 
+// This is the Meteor specific login handler
 Accounts.registerLoginHandler("ldap", function (request) {
   if (!request.ldap) {
     return;  
@@ -257,14 +293,14 @@ Accounts.registerLoginHandler("ldap", function (request) {
     LDAP.log('You need to set "' + LDAP.multitenantIdentifier + '" on the client using LDAP.data for multi-tenant support to work.');
     return;  
   }
-  var username = request.username.toLowerCase();
+  var whatUserTyped = request.username.toLowerCase();
   // Check if this is an email or a username
-  var email = false;
-  var pieces = username.split('@');
+  var isEmail = false;
+  var pieces = whatUserTyped.split('@');
   if (pieces.length === 2) {
 	 if (pieces[1].indexOf('.') > 0) {
        // It's an email
-       var email = true;
+       var isEmail = true;
 	 }
   }
   if (!!Package["accounts-password"] && LDAP.tryDBFirst) {
@@ -273,27 +309,30 @@ Accounts.registerLoginHandler("ldap", function (request) {
     // for a complete implementation
     var fieldName;
     var fieldValue;
+	var user = null;
+	var isMultitenantIdentifier = false;
     if (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) {
+	  isMultitenantIdentifier = true;
       // Making a big assumption here that username and email address text (before the @) are the same
       // it's the best we can do and it doesn't matter too much if we're wrong
-      // It just means we're going to have to hit the LDAP server again instead of the app db
-      var actualUsername = (email) ? username.split('@')[0] : username;
+      // It just means we're going to have to hit the directory server via LDAP again instead of only the app db
       fieldName = 'ldapIdentifier';
-      fieldValue = request.data[LDAP.multitenantIdentifier] + '-' + actualUsername;
+      fieldValue = request.data[LDAP.multitenantIdentifier] + '-' + ((isEmail) ? whatUserTyped.split('@')[0] : whatUserTyped);
+	  // TODO -- What about users in the same tenant with same username?
+	  // Currently, apps need to ensure a single tenant's users have unique usernames.
+	  // Also note: username is a field in the db where uniqueness is enforced by an index
     }
-    else {
-      if (!email) {
+	else {
+      if (!isEmail) {
         fieldName = 'username';
-        fieldValue = username;
+        fieldValue = whatUserTyped;
       }
       else {
         fieldName = 'emails.address';
-        fieldValue = username; // yes, `username` is actually an email address
+        fieldValue = whatUserTyped; // here `whatUserTyped` is apparently an email address
       }
     }
-    var selector = {};
-    selector[fieldName] = fieldValue;
-    var user = Meteor.users.findOne(selector);
+    user = Meteor.users.findOne(LDAP.userLookupQuery.call(request, fieldName, fieldValue, isEmail, isMultitenantIdentifier));
     if (user && user.services && user.services.password && user.services.password.bcrypt && request.pwd) {
       var res = Accounts._checkPassword(user, request.pwd);
       if (!res.error) {
@@ -308,23 +347,24 @@ Accounts.registerLoginHandler("ldap", function (request) {
   if (!settings) {
     throw new Error("LDAP settings missing.");
   }
+  var userObj, person, ldapIdentifierUsername;
   if (settings.debugMode === true) {
-    userObj = {username: actualUsername};
+    userObj = {username: (isEmail) ? whatUserTyped.split('@')[0] : whatUserTyped};
     person = {};
   }
   else {
-    LDAP.log('LDAP authentication for ' + request.username);
-    var client = LDAP._createClient(settings.serverUrl);
+    LDAP.log('LDAP authentication for: ' + request.username);
+    var client = LDAP._createClient.call(settings);
     // For when next version of ldapjs comes out
     /*if (settings.TLS) {
       var tlsStarted = LDAP._starttls(client);
       if (!tlsStarted) {
-        LDAP.log('Not trying to bind to LDAP server.');
+        LDAP.log('TLS not started. Not trying to bind to LDAP server.');
         return;  
       }
     }*/
-    LDAP._bind(client, request.username, request.password, email, request, settings);
-    var returnData = LDAP._search(client, request.username, email, request, settings);
+    LDAP._bind(client, request.username, request.password, isEmail, request, settings);
+    var returnData = LDAP._search(client, request.username, isEmail, request, settings);
 	if (!returnData || !(returnData.userObj && returnData.person)) {
 	  LDAP.log('No record was returned via LDAP');
 	  return; // Login handlers need to return undefined if the login fails
@@ -351,21 +391,22 @@ Accounts.registerLoginHandler("ldap", function (request) {
   
   var userId;
   var condition = {};
-  if (email) {
-    condition.emails = {$elemMatch: {address: username}}; // username is actually an email here 
+  if (isEmail) {
+    condition.emails = {$elemMatch: {address: whatUserTyped}}; 
   }
   else {
-    condition.username = username;  
+    condition.username = LDAP.appUsername.call(request, whatUserTyped, isEmail, userObj);  
   }
   // If we have two users with the same username, or two users with the same email address, we have a problem
   // For situations like this, we might want to modify the condition to include extra fields
   // Possibly based on request.data passed from the client
+  // This is why we have the LDAP.modifyCondition function available to overwrite
   if (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) {
 	var ldapIdentifier = request.data[LDAP.multitenantIdentifier] + '-' + userObj.username;
     condition = {ldapIdentifier: ldapIdentifier};
   }
   else {
-	condition = LDAP.modifyCondition.call(request, condition);
+	condition = LDAP.modifyCondition.call(request, condition, userObj);
   }
   var user = Meteor.users.findOne(condition);
   if (user) {
@@ -382,7 +423,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
 	  var tempUserObj = {};
 	  _.each(userObj, function (val, key) {
 		if (_.contains(allowedFields, key)) {
-		  tempUserObj[key] = val;	
+		  tempUserObj[key] = (key === 'username') ? LDAP.appUsername.call(request, whatUserTyped, isEmail, userObj) : val;	
 		}
 		else {
 		  extraFields[key] = val;	
@@ -421,7 +462,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
             });
           }
           else {
-            throw new Error('Operation failed unexpectedly.', 'User found in LDAP server, but couldn\'t be found in Meteor app. Check user record in database.'); 
+            throw new Error('Operation failed unexpectedly.', 'User found in directory accessed via LDAP, but couldn\'t be found in Meteor app database. Check user record in database.'); 
           }
         }
       }
@@ -467,4 +508,3 @@ Accounts.registerLoginHandler("ldap", function (request) {
     tokenExpires: Accounts._tokenExpiration(hashStampedToken.when)
   };
 });
-    

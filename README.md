@@ -155,6 +155,18 @@ LDAP.tryDBFirst = true;
 **on the server** if you want the package to try and log the user in using the app database before hitting the LDAP server. (This is `false` by default.)
 
 ```
+// This is used to produce the query that checks whether there is an existing user in the database when LDAP.tryDBFirst = true
+// It can be overwritten to produce custom selectors
+LDAP.userLookupQuery = function (fieldName, fieldValue, isEmail, isMultitenantIdentifier) {
+  // Context (this) is the request sent from client
+  var selector = {};
+  selector[fieldName] = fieldValue;
+  // Must return a mongo selector -- e.g. {username: "jackadams"} or {"email.address": "example@example.com"}
+  return selector;
+}
+```
+
+```
 LDAP.logging = false;
 ```
 **on the server** if you want to suppress output to the server console (this is `true` by default, to help with debugging during the initial setup phase)
@@ -180,7 +192,9 @@ The purpose of this hook is to let the app modify a user document if it finds co
 Overwrite this function **on the server** to modify the condition used to find an existing user:
 
 ```
-LDAP.modifyCondition = function (condition) {
+LDAP.modifyCondition = function (condition, userObj) {
+  // `this` is the request from the client
+  // `userObj` has the fields `email`, `username`, `password` (plain text), `profile`
   return condition;    
 }
 ```
@@ -206,6 +220,16 @@ where `'tenant_id'` is a string that gives the name of a key from `request.data`
 
 **Note:** if you use `LDAP.multitenantIdentifier`, then `LDAP.modifyCondition` will have no effect, as the package will create the user identifier for you. Also, a new field `ldapIdentifier` will be added to each document added to the `Meteor.users` collection by this package.
 
+```
+LDAP.appUsername = function (userNameOrEmail, isEmail, userObj) {
+  // userObj contains the best guess we've got for email and username, one of which successfully retrieved a user from the directory using LDAP
+  // `this` is the request received from the client
+  return (isEmail) ? userNameOrEmail.split('@')[0] : userNameOrEmail;	
+}
+```
+
+Overwrite this function **on the server** if the app needs to do something to modify the username of the users in the app database (i.e. the username field in the app should be different from the username field in the directory accessed via LDAP).  Mainly for multi-tenant apps where users belonging to different tenants can have the same username, but because there is a unique index on the `username` field in the `users` collection, this can't happen without modifying the username when: 1) creating a user, 2) doing lookups by username. Overwriting this function takes care of both of those, provided you guarantee unique usernames.
+
 Full example:
 
 _Client_
@@ -226,7 +250,7 @@ Overwrite the function below **on the server** to add custom fields to the new u
 LDAP.addFields = function (person) {
   // `this` is the request from the client
   // `person` is the object returned from the LDAP server
-  // return the fields that are to be added when creating a user as an object of {key: value} pairs
+  // return the fields that are to be added when creating a user as an object with {key: value} pairs
   return {};	
 }
 ```
@@ -243,7 +267,7 @@ The reason for this hook's existence is that when an existing user sucsessfully 
 
 #### Built in UI
 
-`{{> ldapLoginButtons}}` renders a template with username/email and password inputs. If login is successful, the user will be added to the `Meteor.users` collection. It is up to the app to publish and subscribe fields. By default, only the username is published.
+`{{> ldapLoginButtons}}` renders a template with username/email and password inputs. If login is successful, the user will be added to the `Meteor.users` collection. It is up to the app to publish and subscribe to certain fields from the user document. By default, only the username is published.
 
 #### Warning
 
