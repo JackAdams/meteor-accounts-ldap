@@ -1,7 +1,7 @@
 Accounts LDAP - Changelog
 =========================
 
-### v1.0 (Does not exist yet -- will be in the distant future)
+### v1.0 (Does not exist yet -- maybe be in the distant future)
 
 - Automated test suite
 - Configurable enough to support most LDAP authentication scenarios
@@ -9,6 +9,10 @@ Accounts LDAP - Changelog
 ### vNext
 
 - Make UI part separate package
+
+### v0.6.1
+
+- Gave a `uniqueIdentifier` option in the LDAP.settings for more reliable lookups of users in the app database
 
 ### v0.6.0
 

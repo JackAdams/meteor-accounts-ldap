@@ -105,6 +105,11 @@ LDAP.appUsername = function (userNameOrEmail, isEmail, userObj) {
 // Private methods, not intended for app use
 // *****************************************
 
+LDAP._stringifyUniqueIdentifier = function (uniqueIdentifier) {
+  var stringified = JSON.stringify(uniqueIdentifier);
+  return stringified.substr(1, stringified.length - 2);
+}
+
 LDAP._serverDnToFQDN = function (serverDn) {
   return serverDn.toLowerCase().replace(/\s+/g, '').split(/,?dc=/).slice(1).join('.');
 }
@@ -390,104 +395,118 @@ Accounts.registerLoginHandler("ldap", function (request) {
   // LDAP.log("Details of user object to save (before modifications):" + JSON.stringify(userObj));
   
   var userId;
-  var condition = {};
-  if (isEmail) {
-    condition.emails = {$elemMatch: {address: whatUserTyped}}; 
+  if (_.isString(settings.uniqueIdentifier) && person[settings.uniqueIdentifier]) {
+	// Try to find a user the matches the unique identifier
+	// This supercedes the multitenantIdentifier
+	// The uniqueIdentifier must be guaranteed to be globally unique
+	var uniqueIdentifier = LDAP._stringifyUniqueIdentifier(person[settings.uniqueIdentifier]);
+	var query = {ldapIdentifier: uniqueIdentifier};
+	var user = Meteor.users.findOne(query);
+	if (user) {
+	  userId = user._id;
+	  LDAP.log('User found in app database by uniqueIdentifier: ' + JSON.stringify(user));
+	}
   }
-  else {
-    condition.username = LDAP.appUsername.call(request, whatUserTyped, isEmail, userObj);  
-  }
-  // If we have two users with the same username, or two users with the same email address, we have a problem
-  // For situations like this, we might want to modify the condition to include extra fields
-  // Possibly based on request.data passed from the client
-  // This is why we have the LDAP.modifyCondition function available to overwrite
-  if (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) {
-	var ldapIdentifier = request.data[LDAP.multitenantIdentifier] + '-' + userObj.username;
-    condition = {ldapIdentifier: ldapIdentifier};
-  }
-  else {
-	condition = LDAP.modifyCondition.call(request, condition, userObj);
-  }
-  var user = Meteor.users.findOne(condition);
-  if (user) {
-    LDAP.log('User found in app database: '+ JSON.stringify(user));
-    userId = user._id;
-    // Meteor.users.update(userId, {$set: userObj});
-  }
-  else {
-    LDAP.log('Creating user: ' + JSON.stringify(userObj));
-    var skip = false;
-    try {
-	  var allowedFields = ['username', 'email', 'password', 'profile'];
-	  var extraFields = {};
-	  var tempUserObj = {};
-	  _.each(userObj, function (val, key) {
-		if (_.contains(allowedFields, key)) {
-		  tempUserObj[key] = (key === 'username') ? LDAP.appUsername.call(request, whatUserTyped, isEmail, userObj) : val;	
+  if (!userId) {
+	var condition = {};
+	if (isEmail) {
+	  condition.emails = {$elemMatch: {address: whatUserTyped}}; 
+	}
+	else {
+	  condition.username = LDAP.appUsername.call(request, whatUserTyped, isEmail, userObj);  
+	}
+	// If we have two users with the same username, or two users with the same email address, we have a problem
+	// For situations like this, we might want to modify the condition to include extra fields
+	// Possibly based on request.data passed from the client
+	// This is why we have the LDAP.modifyCondition function available to overwrite
+	if (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) {
+	  var ldapIdentifier = request.data[LDAP.multitenantIdentifier] + '-' + userObj.username;
+	  condition = {ldapIdentifier: ldapIdentifier};
+	}
+	else {
+	  condition = LDAP.modifyCondition.call(request, condition, userObj);
+	}
+	var user = Meteor.users.findOne(condition);
+	if (user) {
+	  LDAP.log('User found in app database: '+ JSON.stringify(user));
+	  userId = user._id;
+	  // Meteor.users.update(userId, {$set: userObj});
+	}
+	else {
+	  LDAP.log('Creating user: ' + JSON.stringify(userObj));
+	  var skip = false;
+	  try {
+		var allowedFields = ['username', 'email', 'password', 'profile'];
+		var extraFields = {};
+		var tempUserObj = {};
+		_.each(userObj, function (val, key) {
+		  if (_.contains(allowedFields, key)) {
+			tempUserObj[key] = (key === 'username') ? LDAP.appUsername.call(request, whatUserTyped, isEmail, userObj) : val;	
+		  }
+		  else {
+			extraFields[key] = val;	
+		  }
+		});
+		userId = Accounts.createUser(tempUserObj);
+		user = Meteor.users.findOne({_id: userId});
+		if (user) {
+		  Meteor.users.update({_id: userId}, {$set: extraFields});  
+		}
+	  }
+	  catch (err) {
+		if (err.error === 403 && userObj.email) {
+		  // Email already exists
+		  // the reason for this is that no user was found in the database based on the condition
+		  // because the condition was using the multitenantIdentifier.
+		  // i.e. the user was created without using the current organization's multitenantIdentifier
+		  // Emails are unique to individual, so we will use the email address to get the user and
+		  // we'll add the correct ldapIdentifier to the user document
+		  // and fire a callback to let the app know that we've added a ldapIdentifier
+		  LDAP.log('Account with this email already exists.');
+		  if (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) {
+			LDAP.log('Adding a new ldapIdentifier: ' + userObj.ldapIdentifier[0]);
+			var condition = {};
+			condition.emails = {$elemMatch: {address: userObj.email}};
+			var user = Meteor.users.findOne(condition);
+			if (user) {
+			  var userId = user._id;
+			  // Add the ldapIdentifier
+			  Meteor.users.update({_id: userId}, {$addToSet: {ldapIdentifier: userObj.ldapIdentifier[0]}});
+			  LDAP.log('Fields added using LDAP.addFields will be ignored');
+			  skip = true;
+			  LDAP.log('Use LDAP.onAddMultitenantIdentifier to add or update fields as needed in this situation');
+			  _.each(LDAP._callbacks.onAddMultitenantIdentifier, function (callback) {
+				callback.call(request, ldapIdentifier, user, userObj);
+			  });
+			}
+			else {
+			  throw new Error('Operation failed unexpectedly.', 'User found in directory accessed via LDAP, but couldn\'t be found in Meteor app database. Check user record in database.'); 
+			}
+		  }
 		}
 		else {
-		  extraFields[key] = val;	
+		  LDAP.log('Unable to create user');
+		  console.log(err);  
 		}
-	  });
-      userId = Accounts.createUser(tempUserObj);
-      user = Meteor.users.findOne({_id: userId});
-	  if (user) {
-	    Meteor.users.update({_id: userId}, {$set: extraFields});  
 	  }
-    }
-    catch (err) {
-      if (err.error === 403 && userObj.email) {
-        // Email already exists
-        // the reason for this is that no user was found in the database based on the condition
-        // because the condition was using the multitenantIdentifier.
-        // i.e. the user was created without using the current organization's multitenantIdentifier
-        // Emails are unique to individual, so we will use the email address to get the user and
-        // we'll add the correct ldapIdentifier to the user document
-        // and fire a callback to let the app know that we've added a ldapIdentifier
-        LDAP.log('Account with this email already exists.');
-        if (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) {
-          LDAP.log('Adding a new ldapIdentifier: ' + userObj.ldapIdentifier[0]);
-          var condition = {};
-          condition.emails = {$elemMatch: {address: userObj.email}};
-          var user = Meteor.users.findOne(condition);
-          if (user) {
-            var userId = user._id;
-            // Add the ldapIdentifier
-            Meteor.users.update({_id: userId}, {$addToSet: {ldapIdentifier: userObj.ldapIdentifier[0]}});
-            LDAP.log('Fields added using LDAP.addFields will be ignored');
-            skip = true;
-            LDAP.log('Use LDAP.onAddMultitenantIdentifier to add or update fields as needed in this situation');
-            _.each(LDAP._callbacks.onAddMultitenantIdentifier, function (callback) {
-              callback.call(request, ldapIdentifier, user, userObj);
-            });
-          }
-          else {
-            throw new Error('Operation failed unexpectedly.', 'User found in directory accessed via LDAP, but couldn\'t be found in Meteor app database. Check user record in database.'); 
-          }
-        }
-      }
-      else {
-        LDAP.log('Unable to create user');
-        console.log(err);  
-      }
-    }
-    if (!skip) {
-      LDAP.log('New user _id: ' + userId);
-      if (userId && userObj) {
-        delete userObj.username;
-        delete userObj.email;
-        delete userObj.password;
-        delete userObj.profile;
-        // Because Accounts.createUser only accepts username, email, password and profile fields
-        if (!_.isEmpty(userObj)) {
-          Meteor.users.update({_id: userId}, {$set: userObj}, function (err, res) {
-            if (err) {
-              LDAP.log(err);  
-            }
-          });
-        }
-      }
-    }
+	  if (!skip) {
+		LDAP.log('New user _id: ' + userId);
+		if (userId && userObj) {
+		  delete userObj.username;
+		  delete userObj.email;
+		  delete userObj.password;
+		  delete userObj.profile;
+		  // Because Accounts.createUser only accepts username, email, password and profile fields
+		  if (!_.isEmpty(userObj)) {
+			Meteor.users.update({_id: userId}, {$set: userObj}, function (err, res) {
+			  if (err) {
+				LDAP.log(err);  
+			  }
+			});
+		  }
+		}
+	  }
+	}
   }
   if (settings.autopublishFields) {
     Accounts.addAutopublishFields({
@@ -501,7 +520,14 @@ Accounts.registerLoginHandler("ldap", function (request) {
   });
   var stampedToken = Accounts._generateStampedLoginToken();
   var hashStampedToken = Accounts._hashStampedToken(stampedToken);
-  Meteor.users.update(userId, {$push: {'services.resume.loginTokens': hashStampedToken}});
+  var pushToUser = {'services.resume.loginTokens': hashStampedToken};
+  if (_.isString(settings.uniqueIdentifier) && person[settings.uniqueIdentifier]) {
+	var uniqueIdentifier = LDAP._stringifyUniqueIdentifier(person[settings.uniqueIdentifier]);
+	if (!_.contains(user.ldapIdentifier || [], uniqueIdentifier)) {
+      pushToUser.ldapIdentifier = uniqueIdentifier;
+	}
+  }
+  Meteor.users.update(userId, {$push: pushToUser});
   return {
     userId: userId,
     token: stampedToken.token,

@@ -24,15 +24,16 @@ The things that this package does differently from `hive:accounts-ldap` are:
 
 #### Usage
 
-Your server's URL and a DN or DNs to search will need to be set in a settings.json file as `serverUrl` and `serverDn`, respectively. In addition, you can select an array of `whiteListedFields` from an LDAP search to add to the `user.profile` field in the document created in `Meteor.users` . An example for the settings.json file is:
+Your server's URL and a DN or DNs to search will need to be set in a settings.json file as `serverUrl` and `serverDn`, respectively. In addition, you can select an array of `whiteListedFields` from an LDAP search to add to the `user.profile` field in the document created in `Meteor.users`. Or (optionally) choose a globally unique field to be recorded in the app database for more reliable lookups on subsequent logins. An example for the settings.json file is:
 
 ```
 {
   "ldap": {
     "serverDn": "DC=ad,DC=university,DC=edu",
     "serverUrl": "ldap://ad.university.edu:389",
-    "whiteListedFields": [ "displayName", "givenName", "department", "employeeNumber", "mail", "title", "address", "phone", "memberOf"],
-    "autopublishFields": [ "displayName", "department", "mail", "title", "address", "phone"]
+    // "whiteListedFields": [ "displayName", "givenName", "department", "employeeNumber", "mail", "title", "address", "phone", "memberOf"],
+    // "autopublishFields": [ "displayName", "department", "mail", "title", "address", "phone"],
+	// "uniqueIdentifier": "objectGUID"
   }
 }
 ```
