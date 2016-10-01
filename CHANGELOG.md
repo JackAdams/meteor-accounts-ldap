@@ -10,6 +10,11 @@ Accounts LDAP - Changelog
 
 - Make UI part separate package
 
+### v0.7.0
+
+- Updated ldapjs version to 1.0.0
+- __[BREAKING CHANGE]__ Package published without platform-specific builds, so a [build toolchain](https://guide.meteor.com/1.4-migration.html#binary-packages-require-build-toolchain) will need to be installed on each target deployment machine
+
 ### v0.6.1
 
 - Gave a `uniqueIdentifier` option in the LDAP.settings for more reliable lookups of users in the app database

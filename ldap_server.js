@@ -231,13 +231,13 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
     var serverDn = serverDNs[k];
 	opts.filter = LDAP.filter.call(request, isEmail, searchUsername, LDAP._serverDnToFQDN(serverDn));
     LDAP.log ('Searching ' + serverDn);
-    client.search(serverDn, opts, function(err, res) {
+    client.search(serverDn, opts, function (err, res) {
       userObj = {};
       if (err) {
         searchFuture.return(500);
       }
       else {
-        res.on('searchEntry', function(entry) {
+        res.on('searchEntry', function (entry) {
           var person = entry.object;
           var usernameOrEmail = searchUsername.toLowerCase();
           var username = (isEmail) ? usernameOrEmail.split('@')[0] : usernameOrEmail; // Used to have: person.cn || usernameOrEmail.split('@')[0] -- guessing the username based on the email is pretty poor
@@ -257,13 +257,13 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
             searchFuture.return(false);
           }
         });
-        res.on('error', function(err) {
+        res.on('error', function (err) {
           LDAP.log('error: ' + err.message);
           if (!searchFuture.isResolved()) {
             searchFuture.return(false);
           }
         });
-        res.on('end', function(result) {
+        res.on('end', function (result) {
           if (_.isEmpty(userObj)) {
             //Our LDAP server gives no indication that we found no entries for our search, so we have to make sure our object isn't empty.
             LDAP.log("No result found.");
