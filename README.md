@@ -1,7 +1,7 @@
 Accounts LDAP
 -------------
 
-__BREAKING CHANGE: v0.7.0 (uses ldapjs v1.0.0 instead of v0.7.1) is published without platform-specific builds, so a [build toolchain](https://guide.meteor.com/1.4-migration.html#binary-packages-require-build-toolchain) will need to be installed on each target deployment machine.__
+__BREAKING CHANGE: v0.7.0 (uses ldapjs v1.0.0 instead of v0.7.1) is published without platform-specific builds, so a [build toolchain](https://guide.meteor.com/1.4-migration.html#binary-packages-require-build-toolchain) will need to be installed on each target deployment machine.__ If you are having issues, you can also try installing the bcrypt package from meteor: `meteor add npm-bcrypt`.
 
 Authentication and account management for Meteor using LDAP.
 
