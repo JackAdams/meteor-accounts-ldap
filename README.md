@@ -184,6 +184,18 @@ LDAP.log: function (message) {
 }
 ```
 
+Additionally you can overwrite the following warn and error functions **on the server** to handle warnings and errors 
+separately (per default they both log their messages on the console if logging is enabled):
+
+```
+LDAP.warn: function (message) {
+  this.log(message);
+},
+LDAP.error: function (message) {
+  this.log(message);
+}
+```
+
 This is a hook you can use **on the server** when a user successfully signs in using LDAP (doesn't fire if the sign in is via the app database when using `LDAP.tryDBFirst`)
 ```
 LDAP.onSignIn(function (userDocument, userData, ldapEntry) {

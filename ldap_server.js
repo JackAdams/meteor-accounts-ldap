@@ -5,6 +5,12 @@ LDAP = {
       console.log(message);
     }
   },
+  warn: function (message) {
+      this.log(message);
+  },
+  error: function (message) {
+      this.log(message);
+  },
   multitenantIdentifier: '',
   searchField: 'cn',
   searchValueType: 'username'
@@ -168,9 +174,9 @@ LDAP._createClient = function () {
   client.starttls(function (err) {
     LDAP.log ('Callback from starting TLS for LDAP:');
     if (err) {
-      LDAP.log(JSON.stringify(err));
-      LDAP.log('LDAP TLS startup failed with error');
-      LDAP.log(JSON.stringify({dn: err.dn, code: err.code, name: err.name, message: err.message}));
+      LDAP.error(JSON.stringify(err));
+      LDAP.error('LDAP TLS startup failed with error');
+      LDAP.error(JSON.stringify({dn: err.dn, code: err.code, name: err.name, message: err.message}));
       tlsFuture.return(false);
     } else {
       tlsFuture.return(true);
@@ -198,9 +204,9 @@ LDAP._bind = function (client, username, password, isEmail, request, settings) {
     client.bind(userDn, password, function (err) {
       LDAP.log ('Callback from binding LDAP:');
       if (err) {
-        LDAP.log(JSON.stringify(err));
-        LDAP.log('LDAP bind failed with error');
-        LDAP.log(JSON.stringify({dn: err.dn, code: err.code, name: err.name, message: err.message}));
+        LDAP.error(JSON.stringify(err));
+        LDAP.error('LDAP bind failed with error');
+        LDAP.error(JSON.stringify({dn: err.dn, code: err.code, name: err.name, message: err.message}));
         bindFuture.return(false);
       } else {
         bindFuture.return(true);
@@ -258,7 +264,7 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
           }
         });
         res.on('error', function (err) {
-          LDAP.log('error: ' + err.message);
+          LDAP.error('error: ' + err.message);
           if (!searchFuture.isResolved()) {
             searchFuture.return(false);
           }
@@ -295,7 +301,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
     return;  
   }
   if (LDAP.multitenantIdentifier && !(request.data && request.data[LDAP.multitenantIdentifier])) {
-    LDAP.log('You need to set "' + LDAP.multitenantIdentifier + '" on the client using LDAP.data for multi-tenant support to work.');
+    LDAP.warn('You need to set "' + LDAP.multitenantIdentifier + '" on the client using LDAP.data for multi-tenant support to work.');
     return;  
   }
   var whatUserTyped = request.username.toLowerCase();
@@ -364,7 +370,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
     /*if (settings.TLS) {
       var tlsStarted = LDAP._starttls(client);
       if (!tlsStarted) {
-        LDAP.log('TLS not started. Not trying to bind to LDAP server.');
+        LDAP.warn('TLS not started. Not trying to bind to LDAP server.');
         return;  
       }
     }*/
@@ -485,7 +491,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
 		  }
 		}
 		else {
-		  LDAP.log('Unable to create user');
+		  LDAP.error('Unable to create user');
 		  console.log(err);  
 		}
 	  }
@@ -500,7 +506,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
 		  if (!_.isEmpty(userObj)) {
 			Meteor.users.update({_id: userId}, {$set: userObj}, function (err, res) {
 			  if (err) {
-				LDAP.log(err);  
+				LDAP.error(err);
 			  }
 			});
 		  }
