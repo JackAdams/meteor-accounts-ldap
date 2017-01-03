@@ -10,6 +10,10 @@ Accounts LDAP - Changelog
 
 - Make UI part separate package
 
+### v0.7.1
+
+- Added `LDAP.error` and `LDAP.warn` methods on the server instead of just `LDAP.log`
+
 ### v0.7.0
 
 - Updated ldapjs version to 1.0.0
