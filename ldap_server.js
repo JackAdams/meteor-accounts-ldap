@@ -159,6 +159,11 @@ LDAP._createClient = function () {
       url: serverUrl
     });
   }
+
+  client.on('error', function (error) {
+      LDAP.error('ldapjs client reported an error: ', error);
+  });
+
   return client;
 };
 
