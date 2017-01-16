@@ -8,7 +8,12 @@ Accounts LDAP - Changelog
 
 ### vNext
 
-- Make UI part separate package
+- Make UI part a separate package
+
+### v0.7.2
+
+- Handles error if client cannot be created successfully
+- Updated the version constraint on `less` package to @2.7.8 (I would like to remove version constraint completely, but this causes the constraint solver to melt down)
 
 ### v0.7.1
 
