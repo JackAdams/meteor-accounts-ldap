@@ -73,6 +73,9 @@ LDAP.userLookupQuery = function (fieldName, fieldValue, isEmail, isMultitenantId
   return selector;
 }
 
+// this contains the LDAP attributes to fetch - an empty array means all user attributes
+LDAP.attributes = [];
+
 LDAP.addFields = function (entry) {
   // `this` is the request from the client
   // `entry` is the object returned from the LDAP server
@@ -233,7 +236,8 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
   // Search our previously bound connection. If the LDAP client isn't bound, this should throw an error.
   var opts = {
     scope: 'sub',
-    timeLimit: 2
+    timeLimit: 2,
+    attributes: LDAP.attributes
   };
   var serverDNs = (typeof(settings.serverDn) == 'string') ? [settings.serverDn] : settings.serverDn;
   var result = false;

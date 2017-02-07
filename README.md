@@ -153,6 +153,20 @@ You can set `LDAP.searchField` and `LDAP.searchValueType` to be string values or
 The three `LDAP.searchValueType` values that are built in are: `username`, `email`, and `userPrincipalName`.
 
 ```
+LDAP.attributes = [];
+```
+Set this value **on the server** to explicitly specify what attributes you want to return from the LDAP server.
+```
+LDAP.attributes = ['uid', 'cn', 'memberOf'];
+```
+
+You can use this to return only the LDAP attributes that you're interested in, or to request attributes that
+ are *not* returned by default, like OpenLDAP *operational attributes*.
+
+An empty array (the default) will return the default attributes.
+
+
+```
 LDAP.tryDBFirst = true;
 ```
 **on the server** if you want the package to try and log the user in using the app database before hitting the LDAP server. (This is `false` by default.)
