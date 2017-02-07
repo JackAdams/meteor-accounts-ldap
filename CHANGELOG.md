@@ -10,6 +10,10 @@ Accounts LDAP - Changelog
 
 - Make UI part a separate package
 
+### v0.7.3
+
+- Addition of `LDAP.attributes` option to change the default set of attributes returned
+
 ### v0.7.2
 
 - Handles error if client cannot be created successfully
