@@ -465,6 +465,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
 		userId = Accounts.createUser(tempUserObj);
 		user = Meteor.users.findOne({_id: userId});
 		if (user) {
+		  console.log(extraFields);
 		  Meteor.users.update({_id: userId}, {$set: extraFields});  
 		}
 	  }
