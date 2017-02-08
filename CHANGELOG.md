@@ -1,7 +1,7 @@
 Accounts LDAP - Changelog
 =========================
 
-### v1.0 (Does not exist yet -- maybe be in the distant future)
+### v1.0 (Does not exist yet -- maybe in the distant future)
 
 - Automated test suite
 - Configurable enough to support most LDAP authentication scenarios
