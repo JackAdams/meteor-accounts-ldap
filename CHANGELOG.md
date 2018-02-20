@@ -10,6 +10,10 @@ Accounts LDAP - Changelog
 
 - Make UI part a separate package
 
+### v0.7.5
+
+- Added `onSuccessfulLogin` hook
+
 ### v0.7.4
 
 - Added a missing check to avoid a mongo error in certain cases

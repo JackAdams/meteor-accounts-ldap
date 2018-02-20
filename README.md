@@ -79,6 +79,13 @@ LDAP.username = function (user) { return ''; };
 ```
 If you don't overwrite it, `currentUser.username` will be used; or, if that isn't found, the first email address for that user; or, if that isn't found, "Authenticated user".
 
+The is a client-side hook that can be used when a user logs in successfully:
+
+```
+LDAP.onSuccessfulLogin = function (user) { };
+```
+Overwrite this function with whatever you need to happen after a user logs in.
+
 The following are only used if you want to create a custom sign-in form:
 
 ```

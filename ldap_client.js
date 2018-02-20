@@ -1,6 +1,7 @@
 LDAP = {
   data : function () { return null; },
-  username : function (user) { return ''; }
+  username : function (user) { return ''; },
+  onSuccessfulLogin : function (userId) { }
 };
 
 var firstAttempt = new ReactiveVar(true);
@@ -16,17 +17,17 @@ LDAP.formHelpers = {
 };
 
 LDAP.formEvents = {
-  'click #login-buttons-password': function(e, tpl) {
-    initLogin(e,tpl);
+  'click #login-buttons-password': function (e, tpl) {
+    initLogin(e, tpl);
   },
   'keyup input' : function (e, tpl){
-    if (e.keyCode == 13){ //If Enter Key Pressed
-        initLogin(e,tpl);
+    if (e.keyCode === 13) { //If Enter Key Pressed
+        initLogin(e, tpl);
       }
   },
-  'click #login-buttons-logout': function(e) {
+  'click #login-buttons-logout': function (e) {
     firstAttempt.set(true);
-    Meteor.logout(function() {
+    Meteor.logout(function () {
       showForm.set(false);
     });
   }
@@ -68,13 +69,14 @@ Template.ldapLoginButtons.events({
 });
 
 // Initiate Login Process:
-initLogin = function(e, tpl) {
+initLogin = function (e, tpl) {
   firstAttempt.set(true);
   var username = $(tpl.find('input[name="ldap"]')).val();
   var password = $(tpl.find('input[name="password"]')).val();
-  var result = Meteor.loginWithLdap(username, password, function() {
+  var result = Meteor.loginWithLdap(username, password, function () {
 	if (Meteor.userId()) {
 	  showForm.set(false);
+	  LDAP.onSuccessfulLogin(Meteor.user());
 	  return true;
 	}
 	else {
