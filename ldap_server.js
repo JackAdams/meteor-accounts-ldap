@@ -23,7 +23,7 @@ LDAP = {
 // This provides the value that is used along with the user-submitted password to bind to the LDAP server
 
 LDAP.bindValue = function (usernameOrEmail, isEmailAddress, FQDN) {
-  return ((isEmailAddress) ? usernameOrEmail.split('@')[0] : usernameOrEmail) + '@' + FQDN;	
+  return ((isEmailAddress) ? usernameOrEmail.split('@')[0] : usernameOrEmail) + '@' + FQDN;
 }
 
 // This filter, used with default settings for LDAP.searchField assumes that the part of the email address before the @ perfectly matches the cn value for each user
@@ -64,7 +64,7 @@ LDAP.searchValue = function (isEmailAddress, usernameOrEmail, FQDN) {
 // (will only work if accounts-password package is present)
 LDAP.tryDBFirst = false;
 
-// The default 
+// The default
 LDAP.userLookupQuery = function (fieldName, fieldValue, isEmail, isMultitenantIdentifier) {
   // Context (this) is the request sent from client
   var selector = {};
@@ -80,18 +80,18 @@ LDAP.addFields = function (entry) {
   // `this` is the request from the client
   // `entry` is the object returned from the LDAP server
   // return the fields that are to be added when creating a user
-  return {};    
+  return {};
 }
 
 // Overwrite this function to produce settings based on the incoming request
 LDAP.generateSettings = function (request) {
-  return null;    
+  return null;
 }
 
 // Overwrite this function to modify the condition used to find an existing user
 LDAP.modifyCondition = function (condition) {
   // `this` is the request received from the client
-  return condition;    
+  return condition;
 }
 
 LDAP.onSignIn = function (callback) {
@@ -107,7 +107,7 @@ LDAP.onAddMultitenantIdentifier = function (callback) {
 LDAP.appUsername = function (userNameOrEmail, isEmail, userObj) {
   // userObj is the best guess we've got for email and username, one of which successfully retrieved a user from the directory using LDAP
   // `this` is the request received from the client
-  return (isEmail) ? userNameOrEmail.split('@')[0] : userNameOrEmail;	
+  return (isEmail) ? userNameOrEmail.split('@')[0] : userNameOrEmail;
 }
 
 // *****************************************
@@ -133,7 +133,7 @@ LDAP._addCallback = function (callback, target) {
     LDAP._callbacks[target].push(callback);
   }
   else {
-    throw new Meteor.Error(target + ' callback must be a function');  
+    throw new Meteor.Error(target + ' callback must be a function');
   }
 }
 
@@ -174,7 +174,7 @@ LDAP._createClient = function () {
 // TODO - It's out! Update ldapjs version, then test and release this code!
 /*LDAP._starttls = function (client) {
   var success = null;
-  
+
   // Start TLS with our LDAP client.
   LDAP.log ('Trying to start TLS ...');
 
@@ -232,6 +232,39 @@ LDAP._bind = function (client, username, password, isEmail, request, settings) {
   return ;
 };
 
+/*
+This function converts thumbnailPhoto to binary instad of string.
+Thanks to: https://github.com/joyent/node-ldapjs/issues/137#issuecomment-22525683
+*/
+function getProperObject(entry) {
+  var obj = {
+    dn: entry.dn.toString(),
+    controls: []
+  };
+  entry.attributes.forEach(function (a) {
+    var buf = a.buffers;
+    var val = a.vals;
+    var item;
+    if ( a.type == 'thumbnailPhoto' )
+      item = buf;
+    else
+      item = val;
+    if (item && item.length) {
+      if (item.length > 1) {
+        obj[a.type] = item.slice();
+      } else {
+        obj[a.type] = item[0];
+      }
+    } else {
+      obj[a.type] = [];
+    }
+  });
+  entry.controls.forEach(function (element, index, array) {
+    obj.controls.push(element.json);
+  });
+  return obj;
+}
+
 LDAP._search = function (client, searchUsername, isEmail, request, settings) {
   // Search our previously bound connection. If the LDAP client isn't bound, this should throw an error.
   var opts = {
@@ -256,15 +289,16 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
           var person = entry.object;
           var usernameOrEmail = searchUsername.toLowerCase();
           var username = (isEmail) ? usernameOrEmail.split('@')[0] : usernameOrEmail; // Used to have: person.cn || usernameOrEmail.split('@')[0] -- guessing the username based on the email is pretty poor
-          var email = username + '@' + LDAP._serverDnToFQDN(serverDn); // (isEmail) ? usernameOrEmail : person.mail || 
+          var email = username + '@' + LDAP._serverDnToFQDN(serverDn); // (isEmail) ? usernameOrEmail : person.mail ||
           userObj = {
             username: username,
             email: (isEmail) ? usernameOrEmail : person.mail || email, // best we can do with the info we have
             password: request.password,
-            profile: _.pick(entry.object, _.without(settings.whiteListedFields, 'mail'))
+            profile: _.pick(getProperObject(entry), _.without(settings.whiteListedFields, 'mail'))
           };
+
           // _.extend({username: username, email : [{address: email, verified: LDAP.autoVerifyEmail}]}, _.pick(entry.object, _.without(settings.whiteListedFields, 'mail')));
-          searchFuture.return({userObj: userObj, person: person, ldapIdentifierUsername: username}); 
+          searchFuture.return({userObj: userObj, person: person, ldapIdentifierUsername: username});
         });
         res.on('searchReference', function (referral) {
           LDAP.log('referral: ' + referral.uris.join());
@@ -307,11 +341,11 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
 // This is the Meteor specific login handler
 Accounts.registerLoginHandler("ldap", function (request) {
   if (!request.ldap) {
-    return;  
+    return;
   }
   if (LDAP.multitenantIdentifier && !(request.data && request.data[LDAP.multitenantIdentifier])) {
     LDAP.warn('You need to set "' + LDAP.multitenantIdentifier + '" on the client using LDAP.data for multi-tenant support to work.');
-    return;  
+    return;
   }
   var whatUserTyped = request.username.toLowerCase();
   // Check if this is an email or a username
@@ -380,7 +414,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
       var tlsStarted = LDAP._starttls(client);
       if (!tlsStarted) {
         LDAP.warn('TLS not started. Not trying to bind to LDAP server.');
-        return;  
+        return;
       }
     }*/
     LDAP._bind(client, request.username, request.password, isEmail, request, settings);
@@ -394,21 +428,21 @@ Accounts.registerLoginHandler("ldap", function (request) {
     ldapIdentifierUsername = returnData.ldapIdentifierUsername;
     client.unbind();
   }
-  
+
   // Automatically add an ldapIdentifier in multitenant situations
   if (LDAP.multitenantIdentifier) {
     if (request.data && request.data[LDAP.multitenantIdentifier]) {
       userObj.ldapIdentifier = [request.data[LDAP.multitenantIdentifier] + '-' + ldapIdentifierUsername];
     }
   }
-  
+
   // An app may wish to add some fields based on the object returned from the LDAP server
   userObj = _.extend(userObj, LDAP.addFields.call(request, person));
-  
+
   LDAP.log("User successfully retrieved from LDAP server");
   LDAP.log(JSON.stringify(person));
   // LDAP.log("Details of user object to save (before modifications):" + JSON.stringify(userObj));
-  
+
   var userId;
   if (_.isString(settings.uniqueIdentifier) && person[settings.uniqueIdentifier]) {
 	// Try to find a user the matches the unique identifier
@@ -425,10 +459,10 @@ Accounts.registerLoginHandler("ldap", function (request) {
   if (!userId) {
 	var condition = {};
 	if (isEmail) {
-	  condition.emails = {$elemMatch: {address: whatUserTyped}}; 
+	  condition.emails = {$elemMatch: {address: whatUserTyped}};
 	}
 	else {
-	  condition.username = LDAP.appUsername.call(request, whatUserTyped, isEmail, userObj);  
+	  condition.username = LDAP.appUsername.call(request, whatUserTyped, isEmail, userObj);
 	}
 	// If we have two users with the same username, or two users with the same email address, we have a problem
 	// For situations like this, we might want to modify the condition to include extra fields
@@ -456,16 +490,16 @@ Accounts.registerLoginHandler("ldap", function (request) {
 		var tempUserObj = {};
 		_.each(userObj, function (val, key) {
 		  if (_.contains(allowedFields, key)) {
-			tempUserObj[key] = (key === 'username') ? LDAP.appUsername.call(request, whatUserTyped, isEmail, userObj) : val;	
+			tempUserObj[key] = (key === 'username') ? LDAP.appUsername.call(request, whatUserTyped, isEmail, userObj) : val;
 		  }
 		  else {
-			extraFields[key] = val;	
+			extraFields[key] = val;
 		  }
 		});
 		userId = Accounts.createUser(tempUserObj);
 		user = Meteor.users.findOne({_id: userId});
 		if (user && !_.isEmpty(extraFields)) {
-		  Meteor.users.update({_id: userId}, {$set: extraFields});  
+		  Meteor.users.update({_id: userId}, {$set: extraFields});
 		}
 	  }
 	  catch (err) {
@@ -495,13 +529,13 @@ Accounts.registerLoginHandler("ldap", function (request) {
 			  });
 			}
 			else {
-			  throw new Error('Operation failed unexpectedly.', 'User found in directory accessed via LDAP, but couldn\'t be found in Meteor app database. Check user record in database.'); 
+			  throw new Error('Operation failed unexpectedly.', 'User found in directory accessed via LDAP, but couldn\'t be found in Meteor app database. Check user record in database.');
 			}
 		  }
 		}
 		else {
 		  LDAP.error('Unable to create user');
-		  console.log(err);  
+		  console.log(err);
 		}
 	  }
 	  if (!skip) {
