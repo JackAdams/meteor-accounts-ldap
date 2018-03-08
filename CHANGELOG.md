@@ -10,6 +10,10 @@ Accounts LDAP - Changelog
 
 - Make UI part a separate package
 
+### v0.7.6
+
+- Adds support for thumbnail images
+
 ### v0.7.5
 
 - Added `onSuccessfulLogin` hook
