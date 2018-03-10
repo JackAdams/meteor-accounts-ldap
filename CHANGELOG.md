@@ -10,6 +10,10 @@ Accounts LDAP - Changelog
 
 - Make UI part a separate package
 
+### v0.7.7
+
+- Version bump because something went wrong in the publishing process
+
 ### v0.7.6
 
 - Adds support for thumbnail images
