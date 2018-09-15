@@ -34,7 +34,9 @@ LDAP.bindValue = function (usernameOrEmail, isEmailAddress, FQDN) {
 LDAP.filter = function (isEmailAddress, usernameOrEmail, FQDN) {
   var searchField = (_.isFunction(LDAP.searchField)) ? LDAP.searchField.call(this) : LDAP.searchField;
   var searchValue = LDAP.searchValue.call(this, isEmailAddress, usernameOrEmail, FQDN);
-  return '(&(' + searchField + '=' + searchValue + ')(objectClass=user))';
+  var searchFilter = '(&(' + searchField + '=' + searchValue + ')(objectClass=user))';
+  LDAP.log('Search filter: ' + searchFilter);
+  return searchFilter;
 }
 
 // This is the search value that gets used in the LDAP.filter function above
@@ -45,7 +47,7 @@ LDAP.filter = function (isEmailAddress, usernameOrEmail, FQDN) {
 LDAP.searchValue = function (isEmailAddress, usernameOrEmail, FQDN) {
   var username = (isEmailAddress) ? usernameOrEmail.split('@')[0] : usernameOrEmail;
   var searchValue;
-  var searchValueType = (_.isFunction(LDAP.searchValueType)) ? LDAP.searchValueType.call(this) : LDAP.searchValueType;
+  var searchValueType = (_.isFunction(LDAP.searchValueType)) && LDAP.searchValueType.call(this) || LDAP.searchValueType || 'username';
   switch (searchValueType) {
 	case 'userPrincipalName' :
 	  searchValue = username + '@' + FQDN;
@@ -233,7 +235,7 @@ LDAP._bind = function (client, username, password, isEmail, request, settings) {
 };
 
 /*
-This function converts thumbnailPhoto to binary instad of string.
+This function converts thumbnailPhoto to binary instead of string.
 Thanks to: https://github.com/joyent/node-ldapjs/issues/137#issuecomment-22525683
 */
 function getProperObject(entry) {
@@ -245,17 +247,21 @@ function getProperObject(entry) {
     var buf = a.buffers;
     var val = a.vals;
     var item;
-    if ( a.type == 'thumbnailPhoto' )
+    if ( a.type == 'thumbnailPhoto' ) {
       item = buf;
-    else
+	}
+    else {
       item = val;
+	}
     if (item && item.length) {
       if (item.length > 1) {
         obj[a.type] = item.slice();
-      } else {
+      }
+	  else {
         obj[a.type] = item[0];
       }
-    } else {
+    }
+	else {
       obj[a.type] = [];
     }
   });
@@ -464,15 +470,15 @@ Accounts.registerLoginHandler("ldap", function (request) {
 	else {
 	  condition.username = LDAP.appUsername.call(request, whatUserTyped, isEmail, userObj);
 	}
-	// If we have two users with the same username, or two users with the same email address, we have a problem
-	// For situations like this, we might want to modify the condition to include extra fields
-	// Possibly based on request.data passed from the client
-	// This is why we have the LDAP.modifyCondition function available to overwrite
 	if (LDAP.multitenantIdentifier && request.data && request.data[LDAP.multitenantIdentifier]) {
 	  var ldapIdentifier = request.data[LDAP.multitenantIdentifier] + '-' + userObj.username;
 	  condition = {ldapIdentifier: ldapIdentifier};
 	}
 	else {
+	  // If we have two users with the same username, or two users with the same email address, we have a problem
+	  // For situations like this, we might want to modify the condition to include extra fields
+	  // Possibly based on request.data passed from the client
+	  // This is why we have the LDAP.modifyCondition function available to overwrite
 	  condition = LDAP.modifyCondition.call(request, condition, userObj);
 	}
 	var user = Meteor.users.findOne(condition);
