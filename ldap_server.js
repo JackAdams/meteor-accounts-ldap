@@ -31,9 +31,9 @@ LDAP.bindValue = function (usernameOrEmail, isEmailAddress, FQDN) {
 // For example if everyone has the 'mail' field set, but the bit before the @ in the email address doesn't exactly match users' cn values, you could do:
 // LDAP.filter = function (isEmailAddress, usernameOrEmail, FQDN) { return '(&(' + ((isEmailAddress) ? 'mail' : 'cn') + '=' + usernameOrEmail + ')(objectClass=user))'; }
 
-LDAP.filter = function (isEmailAddress, usernameOrEmail, FQDN) {
-  var searchField = (_.isFunction(LDAP.searchField)) ? LDAP.searchField.call(this) : LDAP.searchField;
-  var searchValue = LDAP.searchValue.call(this, isEmailAddress, usernameOrEmail, FQDN);
+LDAP.filter = function (isEmailAddress, usernameOrEmail, FQDN, settings) {
+  var searchField = _.isFunction(LDAP.searchField) && LDAP.searchField.call(this) || settings.searchField || LDAP.searchField || 'cn';
+  var searchValue = LDAP.searchValue.call(this, isEmailAddress, usernameOrEmail, FQDN, settings);
   var searchFilter = '(&(' + searchField + '=' + searchValue + ')(objectClass=user))';
   LDAP.log('Search filter: ' + searchFilter);
   return searchFilter;
@@ -44,10 +44,10 @@ LDAP.filter = function (isEmailAddress, usernameOrEmail, FQDN) {
 // from the directory.
 // Overwrite so that it matches your specific directory structure
 
-LDAP.searchValue = function (isEmailAddress, usernameOrEmail, FQDN) {
+LDAP.searchValue = function (isEmailAddress, usernameOrEmail, FQDN, settings) {
   var username = (isEmailAddress) ? usernameOrEmail.split('@')[0] : usernameOrEmail;
   var searchValue;
-  var searchValueType = (_.isFunction(LDAP.searchValueType)) && LDAP.searchValueType.call(this) || LDAP.searchValueType || 'username';
+  var searchValueType = (_.isFunction(LDAP.searchValueType)) && LDAP.searchValueType.call(this) || settings.searchField || LDAP.searchValueType || 'username';
   switch (searchValueType) {
 	case 'userPrincipalName' :
 	  searchValue = username + '@' + FQDN;
@@ -283,7 +283,7 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
   for (var k in serverDNs) {
     var searchFuture = new Future();
     var serverDn = serverDNs[k];
-	opts.filter = LDAP.filter.call(request, isEmail, searchUsername, LDAP._serverDnToFQDN(serverDn));
+	opts.filter = LDAP.filter.call(request, isEmail, searchUsername, LDAP._serverDnToFQDN(serverDn), settings);
     LDAP.log ('Searching ' + serverDn);
     client.search(serverDn, opts, function (err, res) {
       userObj = {};
