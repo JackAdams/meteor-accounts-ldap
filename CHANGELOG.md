@@ -10,6 +10,10 @@ Accounts LDAP - Changelog
 
 - Make UI part a separate package
 
+### v0.8.0
+
+- Added an `LDAP.alwaysCreateAccountIf` optional setting, which means package will accept any email address and password combination and make an account out of it if 1) the combination doesn't already exist and 2) this function (`LDAP.alwaysCreateAccountIf`) returns true
+
 ### v0.7.9
 
 - Tenant specific search configurations

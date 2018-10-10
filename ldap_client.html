@@ -16,9 +16,15 @@
           <label for="password" id="login-password-label">Password</label>
           <input id="login-password" type="password" name="password">
         </div>
+        {{#each extraFormFields}}
+          <div id="login-{{field}}-label-and-input">
+            <label for="{{field}}" id="login-{{field}}-label">{{name}}</label>
+            <input id="login-{{field}}" class="login-extra-field" type="text" name="{{field}}">
+          </div>
+        {{/each}}
         {{#if failedLogin}}
           <div class="message error-message">
-            Invalid sign in details
+            {{errorMessage}}
           </div>
         {{/if}}
         <div id="login-buttons-password" class="login-button login-button-form-submit" name="login">Sign in</div>
