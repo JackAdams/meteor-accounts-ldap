@@ -352,7 +352,7 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
 };
 
 // This is the Meteor specific login handler
-Accounts.registerLoginHandler("ldap", function (request) { console.log(request);
+Accounts.registerLoginHandler("ldap", function (request) {
   if (!request.ldap) {
     return;
   }
