@@ -6,10 +6,10 @@ LDAP = {
     }
   },
   warn: function (message) {
-    this.log(message);
+    LDAP.log(JSON.stringify(message));
   },
   error: function (message) {
-    this.log(message);
+    LDAP.log(JSON.stringify(message));
   },
   alwaysCreateAccountIf: null,
   multitenantIdentifier: '',
@@ -168,7 +168,9 @@ LDAP._createClient = function () {
   }
 
   client.on('error', function (error) {
-      LDAP.error('ldapjs client reported an error: ', error);
+    LDAP.error('ldapjs client reported an error: ', error);
+    client.destroy();
+    throw new Meteor.Error('ldap-error', 'ldapjs client reported an error', error);
   });
 
   return client;
