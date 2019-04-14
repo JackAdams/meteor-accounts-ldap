@@ -10,6 +10,10 @@ Accounts LDAP - Changelog
 
 - Make UI part a separate package
 
+### v0.8.2
+
+- Retry failed queries made using a multi-tenant identifier with regular login details instead
+
 ### v0.8.1
 
 - Fixed bad security regression in which plaintext passwords were getting printed to the server console. My apologies to everone using this package.

@@ -395,6 +395,14 @@ Accounts.registerLoginHandler("ldap", function (request) {
       // TODO -- What about users in the same tenant with same username?
       // Currently, apps need to ensure a single tenant's users have unique usernames.
       // Also note: username is a field in the db where uniqueness is enforced by an index
+      if (!isEmail) {
+        backupFieldName = 'username';
+        backupFieldValue = whatUserTyped;
+      }
+      else {
+        backupFieldName = 'emails.address';
+        backupFieldValue = whatUserTyped; // here `whatUserTyped` is apparently an email address
+      }
     }
     else {
       if (!isEmail) {
@@ -408,6 +416,11 @@ Accounts.registerLoginHandler("ldap", function (request) {
     }
     var userLookupQuery = LDAP.userLookupQuery.call(request, fieldName, fieldValue, isEmail, isMultitenantIdentifier);
     user = Meteor.users.findOne(userLookupQuery);
+	if (!user && isMultitenantIdentifier) {
+      // try again with backup query
+      var userLookupQuery = LDAP.userLookupQuery.call(request, backupFieldName, backupFieldValue, isEmail, false);
+      user = Meteor.users.findOne(userLookupQuery);
+    }
     if (user && user.services && user.services.password && user.services.password.bcrypt && request.pwd) {
       var res = Accounts._checkPassword(user, request.pwd);
       if (!res.error) {
