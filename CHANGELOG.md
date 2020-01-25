@@ -10,6 +10,10 @@ Accounts LDAP - Changelog
 
 - Make UI part a separate package
 
+### v0.9.1
+
+- Fixed accidental regression
+
 ### v0.9.0
 
 - Updated `ldapjs` to `1.0.2`
