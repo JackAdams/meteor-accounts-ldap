@@ -233,7 +233,7 @@ LDAP._bind = function (client, username, password, isEmail, request, settings) {
   }
 
   if (!success || password === '') {
-    if (_.isFunction(LDAP.alwaysCreateAccountIf) && LDAP.alwaysCreateAccountIf.call(settings, request) && username && password) {
+    if (_.isFunction(LDAP.alwaysCreateAccountIf) && LDAP.alwaysCreateAccountIf(request) && username && password) {
       return true; // true that we should create a user
     }
     else {
@@ -309,7 +309,7 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
             username: username,
             email: (isEmail) ? usernameOrEmail : person.mail || email, // best we can do with the info we have
             password: request.password,
-            profile: _.pick(getProperObject(entry, settings), _.without(settings.whiteListedFields, 'mail'))
+            profile: _.pick(getProperObject(entry, settings), _.without(settings.whiteListedFields, 'mail')) // Used to be `person` instead of getProperObject(entry, settings)
           };
           userObj.username = LDAP.appUsername.call(request, username, isEmail, userObj);
           // _.extend({username: username, email : [{address: email, verified: LDAP.autoVerifyEmail}]}, _.pick(entry.object, _.without(settings.whiteListedFields, 'mail')));
@@ -372,7 +372,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
        var isEmail = true;
      }
   }
-  if (!!Package["accounts-password"] && (LDAP.tryDBFirst || _.isFunction(LDAP.alwaysCreateAccountIf))) {
+  if (!!Package["accounts-password"] && (LDAP.tryDBFirst || (_.isFunction(LDAP.alwaysCreateAccountIf) && LDAP.alwaysCreateAccountIf(request)))) {
     // This is a blunt instrument and not up to MDG standard
     // see: https://github.com/meteor/meteor/blob/devel/packages/accounts-password/password_server.js
     // for a complete implementation
@@ -416,7 +416,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
     }
     var userLookupQuery = LDAP.userLookupQuery.call(request, fieldName, fieldValue, isEmail, isMultitenantIdentifier);
     user = Meteor.users.findOne(userLookupQuery);
-	if (!user && isMultitenantIdentifier) {
+	  if (!user && isMultitenantIdentifier) {
       // try again with backup query
       var userLookupQuery = LDAP.userLookupQuery.call(request, backupFieldName, backupFieldValue, isEmail, false);
       user = Meteor.users.findOne(userLookupQuery);
@@ -599,7 +599,7 @@ Accounts.registerLoginHandler("ldap", function (request) {
               if (res.error) {
                 LDAP.log('User found in app database but password wrong.');
                 throw new Meteor.Error(403, 'Invalid credentials');
-                 }
+              }
             }
             if (user) {
               LDAP.log('Adding a new ldapIdentifier: ' + newLdapIdentifier);

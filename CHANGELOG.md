@@ -10,6 +10,10 @@ Accounts LDAP - Changelog
 
 - Make UI part a separate package
 
+### v0.9.0
+
+- Updated `ldapjs` to `1.0.2`
+
 ### v0.8.2
 
 - Retry failed queries made using a multi-tenant identifier with regular login details instead
