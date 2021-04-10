@@ -16,6 +16,12 @@
           <label for="password" id="login-password-label">Password</label>
           <input id="login-password" type="password" name="password">
         </div>
+        {{#if forgotPasswordLink}}
+          <div>
+            <label for="login-forgot-passwork-link" id="login-forgot-password-label"></label>
+            <a id="login-forgot-passwork-link" href="#"><small>Forgot password?</small></a>
+          </div>
+        {{/if}}
         {{#each extraFormFields}}
           <div id="login-{{field}}-label-and-input">
             <label for="{{field}}" id="login-{{field}}-label">{{name}}</label>

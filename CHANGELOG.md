@@ -10,6 +10,22 @@ Accounts LDAP - Changelog
 
 - Make UI part a separate package
 
+### v0.9.6
+
+- You can now use `{{> ldapLoginButtons forgotPasswordLink=true}}` to give a basic UI to send password reset emails; but you still need to create the UI that handles the reset password uri yourself
+
+### v0.9.5
+
+- Removed the error throw that kills the server
+
+### v0.9.4
+
+- Updated version of `less` dependency to `3.0.1`
+
+### v0.9.2 & v0.9.3
+
+- Version bump as per 1.8.2 instructions in [Meteor changelog](https://github.com/meteor/meteor/blob/devel/History.md)
+
 ### v0.9.1
 
 - Fixed accidental regression

@@ -45,6 +45,22 @@ LDAP.formEvents = {
     // Although this is not a form elememt, custom UIs may use a form element
     // we need to prevent the default behaviour of submitting the form
     evt.preventDefault();
+  },
+  'click #login-forgot-passwork-link': function (e, tpl) {
+    var email = $('#at-field-email').val() || '';
+    var email = prompt('Send reset password link for this email address:', email);
+    if (email) {
+      Accounts.forgotPassword({email: email}, function (err) {
+        if (err) {
+          if (err.error === 403) {
+            alert('There is no account with this email address');
+          }
+        }
+      });
+    }
+    else if (email === '') {
+      alert('Email address required');
+    }
   }
 };
 
