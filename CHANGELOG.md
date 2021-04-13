@@ -10,6 +10,10 @@ Accounts LDAP - Changelog
 
 - Make UI part a separate package
 
+### v0.9.7
+
+- You can now use `{{> ldapLoginButtons signInButtonText="Sign me up!"}}` to customize the text on the sign in button
+
 ### v0.9.6
 
 - You can now use `{{> ldapLoginButtons forgotPasswordLink=true}}` to give a basic UI to send password reset emails; but you still need to create the UI that handles the reset password uri yourself

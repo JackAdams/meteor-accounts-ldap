@@ -21,7 +21,7 @@ LDAP.formHelpers = {
     return errorMessage.get();
   },
   extraFormFields: function () {
-	return LDAP.extraFormFields.get();  
+    return LDAP.extraFormFields.get();  
   }
 };
 

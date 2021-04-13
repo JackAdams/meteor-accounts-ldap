@@ -33,7 +33,7 @@
             {{errorMessage}}
           </div>
         {{/if}}
-        <div id="login-buttons-password" class="login-button login-button-form-submit" name="login">Sign in</div>
+        <div id="login-buttons-password" class="login-button login-button-form-submit" name="login">{{#with signInButtonText}}{{this}}{{else}}Sign In{{/with}}</div>
       {{/if}}
     </div>
   {{/if}}
