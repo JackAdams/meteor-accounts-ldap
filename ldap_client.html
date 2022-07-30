@@ -55,6 +55,9 @@
             <a class="login-close-text">Close</a>
             <div class="login-close-text-clear"></div>
             {{> ldapLogin}}
+            {{#if formTemplate}}
+              {{> Template.dynamic template=formTemplate data=this}}
+            {{/if}}
           </div>
         {{/if}}
       </div>

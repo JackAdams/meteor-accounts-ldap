@@ -12,6 +12,9 @@ var creatingAccount = new ReactiveVar(false);
 var errorMessage = new ReactiveVar('Invalid sign in details');
 
 LDAP.customFormTemplate = customFormTemplate;
+LDAP.forceCloseForm = function () {
+  showForm.set(false);
+}
 
 LDAP.formHelpers = {
   failedLogin : function () {

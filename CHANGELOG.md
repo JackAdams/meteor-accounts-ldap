@@ -10,6 +10,10 @@ Accounts LDAP - Changelog
 
 - Make UI part a separate package
 
+### v0.9.9
+
+- Added an option `formTemplate` to allow an arbitrary template at the end of the login form (e.g. for Google/Microsoft login buttons). Usage: `{{> ldapLoginButtons formTemplate="microsoft_login_button"}}`
+
 ### v0.9.7
 
 - You can now use `{{> ldapLoginButtons signInButtonText="Sign me up!"}}` to customize the text on the sign in button
