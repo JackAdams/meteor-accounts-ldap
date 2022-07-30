@@ -10,6 +10,15 @@ Accounts LDAP - Changelog
 
 - Make UI part a separate package
 
+### v0.10.1
+
+- A fix so that `thumbnailPhoto` field produces the expected base64 string
+
+### v0.10.0
+
+- Updated `ldapjs` dependency to 2.3.3
+- Added a `LDAP.tlsOptions` (type: function) to allow dynamic generation of `tlsOptions`
+
 ### v0.9.10
 
 - Added an option `formTemplate` to allow an arbitrary template at the end of the login form (e.g. for Google/Microsoft login buttons). Usage: `{{> ldapLoginButtons formTemplate="microsoft_login_button"}}`

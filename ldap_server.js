@@ -156,8 +156,9 @@ LDAP._createClient = function () {
   if (serverUrl.indexOf('ldaps://') === 0 && settings.ldapsCertificate) {
     client = ldap.createClient({
       url: serverUrl,
-      tlsOptions: {
-        ca: [settings.ldapsCertificate]
+      tlsOptions: _.isFunction(LDAP.tlsOptions) ? LDAP.tlsOptions(settings) : {
+        // ca: [settings.ldapsCertificate]
+        'rejectUnauthorized': false
       }
     });
   }
@@ -243,43 +244,6 @@ LDAP._bind = function (client, username, password, isEmail, request, settings) {
   return;
 };
 
-/*
-This function converts thumbnailPhoto to binary instead of string.
-Thanks to: https://github.com/joyent/node-ldapjs/issues/137#issuecomment-22525683
-*/
-function getProperObject(entry, settings) {
-  var obj = {
-    dn: entry.dn.toString(),
-    controls: []
-  };
-  entry.attributes.forEach(function (a) {
-    var buf = a.buffers;
-    var val = a.vals;
-    var item;
-    if (a.type == (settings.thumbnailPhotoField || LDAP.thumbnailPhotoField)) {
-      item = buf;
-    }
-    else {
-      item = val;
-    }
-    if (item && item.length) {
-      if (item.length > 1) {
-        obj[a.type] = item.slice();
-      }
-      else {
-        obj[a.type] = item[0];
-      }
-    }
-    else {
-      obj[a.type] = [];
-    }
-  });
-  entry.controls.forEach(function (element, index, array) {
-    obj.controls.push(element.json);
-  });
-  return obj;
-}
-
 LDAP._search = function (client, searchUsername, isEmail, request, settings) {
   // Search our previously bound connection. If the LDAP client isn't bound, this should throw an error.
   var opts = {
@@ -302,6 +266,9 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
       else {
         res.on('searchEntry', function (entry) {
           var person = entry.object;
+          if (entry.raw && entry.raw.thumbnailPhoto) {
+            person.thumbnailPhoto = entry.raw.thumbnailPhoto.toString('base64');
+          }
           var usernameOrEmail = searchUsername.toLowerCase();
           var username = (isEmail) ? usernameOrEmail.split('@')[0] : usernameOrEmail; // Used to have: person.cn || usernameOrEmail.split('@')[0] -- guessing the username based on the email is pretty poor
           var email = (isEmail) ? usernameOrEmail.toLowerCase() : username.toLowerCase() + '@' + LDAP._serverDnToFQDN(serverDn); // (isEmail) ? usernameOrEmail : person.mail ||
@@ -309,7 +276,7 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
             username: username,
             email: (isEmail) ? usernameOrEmail : person.mail || email, // best we can do with the info we have
             password: request.password,
-            profile: _.pick(getProperObject(entry, settings), _.without(settings.whiteListedFields, 'mail')) // Used to be `person` instead of getProperObject(entry, settings)
+            profile: _.pick(person, _.without(settings.whiteListedFields, 'mail'))
           };
           userObj.username = LDAP.appUsername.call(request, username, isEmail, userObj);
           // _.extend({username: username, email : [{address: email, verified: LDAP.autoVerifyEmail}]}, _.pick(entry.object, _.without(settings.whiteListedFields, 'mail')));
