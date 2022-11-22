@@ -153,7 +153,7 @@ LDAP._createClient = function () {
   var client = null;
   var settings = this;
   var serverUrl = settings.serverUrl;
-  if (serverUrl.indexOf('ldaps://') === 0 && settings.ldapsCertificate) {
+ /*  if (serverUrl.indexOf('ldaps://') === 0 && settings.ldapsCertificate) {
     client = ldap.createClient({
       url: serverUrl,
       tlsOptions: _.isFunction(LDAP.tlsOptions) ? LDAP.tlsOptions(settings) : {
@@ -162,11 +162,11 @@ LDAP._createClient = function () {
       }
     });
   }
-  else {
+  else { */
     client = ldap.createClient({
       url: serverUrl
     });
-  }
+  // }
 
   client.on('error', function (error) {
     LDAP.error('ldapjs client reported an error: ', error);
@@ -177,8 +177,6 @@ LDAP._createClient = function () {
   return client;
 };
 
-// If next version of ldapjs ever comes out
-// TODO - It's out! Update ldapjs version, then test and release this code!
 /*LDAP._starttls = function (client) {
   var success = null;
 
@@ -261,26 +259,30 @@ LDAP._search = function (client, searchUsername, isEmail, request, settings) {
     client.search(serverDn, opts, function (err, res) {
       userObj = {};
       if (err) {
-        searchFuture.return(500);
+        if (!searchFuture.isResolved()) {
+          searchFuture.return(500);
+        }
       }
       else {
         res.on('searchEntry', function (entry) {
-          var person = entry.object;
-          if (entry.raw && entry.raw.thumbnailPhoto) {
-            person.thumbnailPhoto = entry.raw.thumbnailPhoto.toString('base64');
+          if (!searchFuture.isResolved()) {
+            var person = entry.object;
+            if (entry.raw && entry.raw.thumbnailPhoto) {
+              person.thumbnailPhoto = entry.raw.thumbnailPhoto.toString('base64');
+            }
+            var usernameOrEmail = searchUsername.toLowerCase();
+            var username = (isEmail) ? usernameOrEmail.split('@')[0] : usernameOrEmail; // Used to have: person.cn || usernameOrEmail.split('@')[0] -- guessing the username based on the email is pretty poor
+            var email = (isEmail) ? usernameOrEmail.toLowerCase() : username.toLowerCase() + '@' + LDAP._serverDnToFQDN(serverDn); // (isEmail) ? usernameOrEmail : person.mail ||
+            userObj = {
+              username: username,
+              email: (isEmail) ? usernameOrEmail : person.mail || email, // best we can do with the info we have
+              password: request.password,
+              profile: _.pick(person, _.without(settings.whiteListedFields, 'mail'))
+            };
+            userObj.username = LDAP.appUsername.call(request, username, isEmail, userObj);
+            // _.extend({username: username, email : [{address: email, verified: LDAP.autoVerifyEmail}]}, _.pick(entry.object, _.without(settings.whiteListedFields, 'mail')));
+            searchFuture.return({userObj: userObj, person: person, ldapIdentifierUsername: username});
           }
-          var usernameOrEmail = searchUsername.toLowerCase();
-          var username = (isEmail) ? usernameOrEmail.split('@')[0] : usernameOrEmail; // Used to have: person.cn || usernameOrEmail.split('@')[0] -- guessing the username based on the email is pretty poor
-          var email = (isEmail) ? usernameOrEmail.toLowerCase() : username.toLowerCase() + '@' + LDAP._serverDnToFQDN(serverDn); // (isEmail) ? usernameOrEmail : person.mail ||
-          userObj = {
-            username: username,
-            email: (isEmail) ? usernameOrEmail : person.mail || email, // best we can do with the info we have
-            password: request.password,
-            profile: _.pick(person, _.without(settings.whiteListedFields, 'mail'))
-          };
-          userObj.username = LDAP.appUsername.call(request, username, isEmail, userObj);
-          // _.extend({username: username, email : [{address: email, verified: LDAP.autoVerifyEmail}]}, _.pick(entry.object, _.without(settings.whiteListedFields, 'mail')));
-          searchFuture.return({userObj: userObj, person: person, ldapIdentifierUsername: username});
         });
         res.on('searchReference', function (referral) {
           LDAP.log('referral: ' + referral.uris.join());
